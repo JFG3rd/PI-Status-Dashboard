@@ -1,0 +1,1755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pi5 NVR Status</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="apple-touch-icon" href="/favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .timestamp {
+            font-size: 1em;
+            opacity: 0.8;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .card h2 {
+            font-size: 1.3em;
+            margin-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+            padding-bottom: 10px;
+        }
+        
+        .stat {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            padding: 8px 0;
+        }
+        
+        .stat-label {
+            opacity: 0.9;
+        }
+        
+        .stat-value {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 25px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 8px;
+            position: relative;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .progress-ok {
+            background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+        }
+        
+        .progress-warning {
+            background: linear-gradient(90deg, #ff9800 0%, #f57c00 100%);
+        }
+        
+        .progress-danger {
+            background: linear-gradient(90deg, #f44336 0%, #d32f2f 100%);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .status-running {
+            background: #4CAF50;
+        }
+        
+        .status-stopped {
+            background: #f44336;
+        }
+        
+        .status-restarting {
+            background: #ff9800;
+        }
+        
+        .container-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+        }
+        
+        .container-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .temp-critical {
+            color: #ff5252;
+            animation: pulse 1s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        .error-message {
+            background: rgba(244, 67, 54, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #f44336;
+        }
+        
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+        
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2c5282 100%);
+            margin: 2% auto;
+            padding: 30px;
+            border: 2px solid #64b5f6;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #64b5f6;
+            padding-bottom: 15px;
+        }
+        
+        .modal-close {
+            color: #aaa;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        
+        .modal-close:hover {
+            color: #fff;
+        }
+        
+        .checkbox-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .checkbox-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .checkbox-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .log-output {
+            background: #0a0e14;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 15px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+            font-size: 0.85em;
+            line-height: 1.4;
+            border: 1px solid #333;
+        }
+        
+        .log-output::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-output::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        .log-output::-webkit-scrollbar-thumb {
+            background: #00ff00;
+            border-radius: 4px;
+        }
+        
+        .action-button {
+            padding: 12px 30px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        
+        .action-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .action-button.primary {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+        }
+        
+        .action-button.secondary {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+        }
+        
+        .action-button:disabled {
+            background: #555;
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        
+        /* Backup/Restore Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+            overflow: auto;
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1a2332 0%, #2d3748 100%);
+            margin: 2% auto;
+            padding: 0;
+            border: 1px solid #3a4a5f;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 900px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        
+        .modal-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 100%);
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h2 {
+            margin: 0;
+            color: #64b5f6;
+        }
+        
+        .close-modal {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            background: none;
+            padding: 0 10px;
+        }
+        
+        .close-modal:hover {
+            color: #fff;
+        }
+        
+        .modal-tabs {
+            display: flex;
+            background: #1a2332;
+            border-bottom: 2px solid #3a4a5f;
+        }
+        
+        .modal-tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: #aaa;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .modal-tab.active {
+            background: #2d3748;
+            color: #64b5f6;
+            border-bottom: 3px solid #64b5f6;
+        }
+        
+        .modal-body {
+            padding: 20px;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .component-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .component-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #3a4a5f;
+        }
+        
+        .component-item label {
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            color: #e0e0e0;
+            font-weight: bold;
+        }
+        
+        .component-item input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .component-description {
+            font-size: 0.85em;
+            color: #aaa;
+            margin-top: 5px;
+            margin-left: 28px;
+        }
+        
+        .log-viewer {
+            background: #000;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 15px;
+            border-radius: 5px;
+            height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+            border: 1px solid #333;
+        }
+        
+        .log-line {
+            margin: 2px 0;
+            word-wrap: break-word;
+        }
+        
+        .log-line.error {
+            color: #ff5252;
+        }
+        
+        .log-line.success {
+            color: #4CAF50;
+        }
+        
+        .log-line.warning {
+            color: #ffa726;
+        }
+        
+        .backup-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .backup-item {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 1px solid #3a4a5f;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .backup-item:hover {
+            background: rgba(100, 181, 246, 0.1);
+            border-color: #64b5f6;
+        }
+        
+        .backup-item.selected {
+            background: rgba(100, 181, 246, 0.2);
+            border-color: #64b5f6;
+        }
+        
+        .backup-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .backup-name {
+            font-weight: bold;
+            color: #64b5f6;
+        }
+        
+        .backup-meta {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .btn-primary {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .btn-primary:hover {
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.5);
+        }
+        
+        .btn-secondary {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.5);
+        }
+        
+        .btn-danger {
+            flex: 1;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #f44336 0%, #d32f2f 100%);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+        }
+        
+        .btn-danger:hover {
+            box-shadow: 0 4px 12px rgba(244, 67, 54, 0.5);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .status-running {
+            background: #1976D2;
+            color: white;
+        }
+        
+        .status-success {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        .status-error {
+            background: #f44336;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><svg style="width: 1.2em; height: 1.2em; vertical-align: middle; margin-right: 10px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="gradHeader" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#2196F3"/><stop offset="100%" style="stop-color:#1976D2"/></linearGradient></defs><circle cx="50" cy="50" r="48" fill="url(#gradHeader)"/><text x="50" y="73" font-family="Georgia,serif" font-size="70" font-weight="bold" fill="white" text-anchor="middle">π</text><circle cx="20" cy="20" r="4" fill="#00FF00" opacity="0.8"/><circle cx="80" cy="20" r="4" fill="#00FF00" opacity="0.8"/><circle cx="20" cy="80" r="4" fill="#00FF00" opacity="0.8"/><circle cx="80" cy="80" r="4" fill="#00FF00" opacity="0.8"/><line x1="20" y1="20" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="80" y1="20" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="20" y1="80" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="80" y1="80" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><circle cx="50" cy="10" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="90" cy="50" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="50" cy="90" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="10" cy="50" r="3" fill="#FF6B6B" opacity="0.8"/><line x1="50" y1="10" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="90" y1="50" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="50" y1="90" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="10" y1="50" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/></svg>Raspberry Pi 5 NVR Status</h1>
+            <div class="timestamp">Last updated: <span id="lastUpdate">Loading...</span></div>
+        </div>
+        
+        <div class="grid">
+            <!-- System Stats -->
+            <div class="card">
+                <h2>⚡ System Performance</h2>
+                <div class="stat">
+                    <span class="stat-label">CPU Temperature:</span>
+                    <span class="stat-value" id="cpuTemp">--°C</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">CPU Usage:</span>
+                    <span class="stat-value" id="cpuUsage">--%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill progress-ok" id="cpuProgress" style="width: 0%">0%</div>
+                </div>
+                <div id="perCoreStats" style="margin-top: 10px;">
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Load Average:</span>
+                    <span class="stat-value" id="loadAvg">-- -- --</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Uptime:</span>
+                    <span class="stat-value" id="uptime">--</span>
+                </div>
+                <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <button onclick="restartSystem()" style="width: 100%; padding: 10px; background: linear-gradient(135deg, #f44336, #d32f2f); border: none; border-radius: 6px; color: white; font-weight: bold; cursor: pointer; font-size: 14px; transition: all 0.3s;" onmouseover="this.style.background='linear-gradient(135deg, #d32f2f, #b71c1c)'" onmouseout="this.style.background='linear-gradient(135deg, #f44336, #d32f2f)'">
+                        🔄 Restart System
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Memory Stats -->
+            <div class="card">
+                <h2>💾 Memory</h2>
+                <div class="stat">
+                    <span class="stat-label">Total:</span>
+                    <span class="stat-value" id="memTotal">-- GB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Used:</span>
+                    <span class="stat-value" id="memUsed">-- GB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Available:</span>
+                    <span class="stat-value" id="memAvail">-- GB</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill progress-ok" id="memProgress" style="width: 0%">0%</div>
+                </div>
+            </div>
+            
+            <!-- Disk Stats -->
+            <div class="card">
+                <h2>💿 Storage</h2>
+                <h3 style="font-size: 0.9em; margin: 10px 0 5px 0; color: #64b5f6;">NVMe (System)</h3>
+                <div class="stat">
+                    <span class="stat-label">Total:</span>
+                    <span class="stat-value" id="diskTotal">-- GB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Used:</span>
+                    <span class="stat-value" id="diskUsed">-- GB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Available:</span>
+                    <span class="stat-value" id="diskAvail">-- GB</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill progress-ok" id="diskProgress" style="width: 0%">0%</div>
+                </div>
+                
+                <div id="usbSsdSection" style="margin-top: 15px; display: none;">
+                    <h3 style="font-size: 0.9em; margin: 10px 0 5px 0; color: #64b5f6;">USB SSD (Backup)</h3>
+                    <div class="stat">
+                        <span class="stat-label">Total:</span>
+                        <span class="stat-value" id="usbTotal">-- GB</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Used:</span>
+                        <span class="stat-value" id="usbUsed">-- GB</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Available:</span>
+                        <span class="stat-value" id="usbAvail">-- GB</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill progress-ok" id="usbProgress" style="width: 0%">0%</div>
+                    </div>
+                    
+                    <!-- Backup/Restore Buttons -->
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button onclick="openBackupModal()" style="flex: 1; padding: 10px; background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9em;">
+                            💾 Backup & Restore
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Network Stats -->
+            <div class="card">
+                <h2>🌐 Network</h2>
+                <div class="stat">
+                    <span class="stat-label">IP Address:</span>
+                    <span class="stat-value" id="ipAddress">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">RX (Received):</span>
+                    <span class="stat-value" id="netRx">-- MB</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">TX (Transmitted):</span>
+                    <span class="stat-value" id="netTx">-- MB</span>
+                </div>
+            </div>
+            
+            <!-- Docker Containers -->
+            <div class="card">
+                <h2>🐳 Docker Containers</h2>
+                <div id="dockerContainers">
+                    <div style="text-align: center; opacity: 0.7;">Loading...</div>
+                </div>
+            </div>
+            
+            <!-- Hailo Status -->
+            <div class="card">
+                <h2>🧠 Hailo AI Accelerator</h2>
+                <div class="stat">
+                    <span class="stat-label">Device:</span>
+                    <span class="stat-value" id="hailoDevice">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Driver:</span>
+                    <span class="stat-value" id="hailoDriver">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Version:</span>
+                    <span class="stat-value" id="hailoVersion">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">PCI Address:</span>
+                    <span class="stat-value" id="hailoPCI">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Firmware:</span>
+                    <span class="stat-value" id="hailoFirmware">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Temperature:</span>
+                    <span class="stat-value" id="hailoTemp">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Power State:</span>
+                    <span class="stat-value" id="hailoPower">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Status:</span>
+                    <span class="stat-value" id="hailoStatus">--</span>
+                </div>
+            </div>
+            
+            <!-- Scrypted NVR -->
+            <div class="card">
+                <h2>📹 Scrypted NVR</h2>
+                <div class="stat">
+                    <span class="stat-label">Status:</span>
+                    <span class="stat-value" id="scryptedStatus">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Uptime:</span>
+                    <span class="stat-value" id="scryptedUptime">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Cameras:</span>
+                    <span class="stat-value" id="scryptedCameras">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Recording:</span>
+                    <span class="stat-value" id="scryptedRecording">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Events Today:</span>
+                    <span class="stat-value" id="scryptedEventsToday">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Events This Week:</span>
+                    <span class="stat-value" id="scryptedEventsWeek">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Storage Used:</span>
+                    <span class="stat-value" id="scryptedStorage">--</span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">Recording Files:</span>
+                    <span class="stat-value" id="scryptedFiles">--</span>
+                </div>
+                <div id="cameraList" style="margin-top: 15px;">
+                    <div style="text-align: center; opacity: 0.7;">Loading cameras...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function updateStats() {
+            fetch('/api/stats', {credentials: 'include'})
+                .then(response => response.json())
+                .then(data => {
+                    // Update timestamp
+                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                    
+                    // CPU Stats
+                    const cpuTemp = parseFloat(data.cpu.temperature);
+                    document.getElementById('cpuTemp').textContent = `${cpuTemp.toFixed(1)}°C`;
+                    if (cpuTemp > 75) {
+                        document.getElementById('cpuTemp').classList.add('temp-critical');
+                    } else {
+                        document.getElementById('cpuTemp').classList.remove('temp-critical');
+                    }
+                    
+                    const cpuUsage = parseFloat(data.cpu.usage);
+                    document.getElementById('cpuUsage').textContent = `${cpuUsage.toFixed(1)}%`;
+                    updateProgressBar('cpuProgress', cpuUsage);
+                    
+                    // Per-core CPU usage
+                    if (data.cpu.per_core) {
+                        const perCoreHtml = data.cpu.per_core.map((core, idx) => {
+                            const corePercent = parseFloat(core);
+                            const barClass = corePercent > 80 ? 'progress-danger' : (corePercent > 60 ? 'progress-warning' : 'progress-ok');
+                            return `
+                                <div class="stat" style="margin-bottom: 3px;">
+                                    <span class="stat-label" style="font-size: 0.85em;">Core ${idx}:</span>
+                                    <span class="stat-value" style="font-size: 0.85em;">${corePercent.toFixed(1)}%</span>
+                                </div>
+                                <div class="progress-bar" style="margin-bottom: 8px; height: 6px;">
+                                    <div class="progress-fill ${barClass}" style="width: ${corePercent}%"></div>
+                                </div>
+                            `;
+                        }).join('');
+                        document.getElementById('perCoreStats').innerHTML = perCoreHtml;
+                    }
+                    
+                    document.getElementById('loadAvg').textContent = data.cpu.load_avg;
+                    document.getElementById('uptime').textContent = data.system.uptime;
+                    
+                    // Memory Stats
+                    document.getElementById('memTotal').textContent = data.memory.total;
+                    document.getElementById('memUsed').textContent = data.memory.used;
+                    document.getElementById('memAvail').textContent = data.memory.available;
+                    updateProgressBar('memProgress', parseFloat(data.memory.percent));
+                    
+                    // Disk Stats - NVMe
+                    document.getElementById('diskTotal').textContent = data.disk.nvme.total;
+                    document.getElementById('diskUsed').textContent = data.disk.nvme.used;
+                    document.getElementById('diskAvail').textContent = data.disk.nvme.available;
+                    updateProgressBar('diskProgress', parseFloat(data.disk.nvme.percent));
+                    
+                    // USB SSD Stats
+                    if (data.disk.usb_ssd && data.disk.usb_ssd.mounted) {
+                        document.getElementById('usbSsdSection').style.display = 'block';
+                        document.getElementById('usbTotal').textContent = data.disk.usb_ssd.total;
+                        document.getElementById('usbUsed').textContent = data.disk.usb_ssd.used;
+                        document.getElementById('usbAvail').textContent = data.disk.usb_ssd.available;
+                        updateProgressBar('usbProgress', parseFloat(data.disk.usb_ssd.percent));
+                    } else {
+                        document.getElementById('usbSsdSection').style.display = 'none';
+                    }
+                    
+                    // Network Stats
+                    document.getElementById('ipAddress').textContent = data.network.ip;
+                    document.getElementById('netRx').textContent = data.network.rx;
+                    document.getElementById('netTx').textContent = data.network.tx;
+                    
+                    // Docker Containers
+                    const dockerDiv = document.getElementById('dockerContainers');
+                    if (data.docker && data.docker.containers && data.docker.containers.length > 0) {
+                        dockerDiv.innerHTML = data.docker.containers.map(container => `
+                            <div class="container-item" style="position: relative;">
+                                <div class="container-name">${container.name}</div>
+                                <div class="stat">
+                                    <span>Status:</span>
+                                    <span class="status-badge status-${container.status.toLowerCase()}">${container.status}</span>
+                                </div>
+                                <div class="stat">
+                                    <span>CPU:</span>
+                                    <span>${container.cpu}</span>
+                                </div>
+                                <div class="stat">
+                                    <span>Memory:</span>
+                                    <span>${container.memory}</span>
+                                </div>
+                                <div style="display: flex; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+                                    <button onclick="controlContainer('${container.name}', 'restart')" style="flex: 1; padding: 6px; background: rgba(33,150,243,0.2); border: 1px solid #2196F3; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 11px; font-weight: bold;" title="Restart container">
+                                        🔄 Restart
+                                    </button>
+                                    <button onclick="controlContainer('${container.name}', 'stop')" style="flex: 1; padding: 6px; background: rgba(255,152,0,0.2); border: 1px solid #FF9800; border-radius: 4px; color: #FF9800; cursor: pointer; font-size: 11px; font-weight: bold;" title="Stop container">
+                                        ⏸ Stop
+                                    </button>
+                                    <button onclick="controlContainer('${container.name}', 'start')" style="flex: 1; padding: 6px; background: rgba(76,175,80,0.2); border: 1px solid #4CAF50; border-radius: 4px; color: #4CAF50; cursor: pointer; font-size: 11px; font-weight: bold;" title="Start container">
+                                        ▶ Start
+                                    </button>
+                                    <button onclick="viewLogs('${container.name}')" style="flex: 1; padding: 6px; background: rgba(156,39,176,0.2); border: 1px solid #9C27B0; border-radius: 4px; color: #9C27B0; cursor: pointer; font-size: 11px; font-weight: bold;" title="View logs">
+                                        📋 Logs
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        dockerDiv.innerHTML = '<div class="error-message">No containers found</div>';
+                    }
+                    
+                    // Hailo Stats
+                    document.getElementById('hailoDevice').textContent = data.hailo.device;
+                    document.getElementById('hailoDriver').textContent = data.hailo.driver;
+                    document.getElementById('hailoVersion').textContent = data.hailo.driver_version;
+                    document.getElementById('hailoPCI').textContent = data.hailo.pci_address;
+                    document.getElementById('hailoFirmware').textContent = data.hailo.firmware;
+                    document.getElementById('hailoTemp').textContent = data.hailo.temperature;
+                    document.getElementById('hailoPower').textContent = data.hailo.power_state;
+                    document.getElementById('hailoStatus').textContent = data.hailo.status;
+                    
+                    // Scrypted Stats
+                    if (data.scrypted && data.scrypted.container) {
+                        document.getElementById('scryptedStatus').textContent = data.scrypted.container.status || 'unknown';
+                        document.getElementById('scryptedUptime').textContent = data.scrypted.container.uptime || 'N/A';
+                    }
+                    
+                    if (data.scrypted && data.scrypted.cameras) {
+                        document.getElementById('scryptedCameras').textContent = data.scrypted.cameras.total || '0';
+                        document.getElementById('scryptedRecording').textContent = data.scrypted.cameras.recording || '0';
+                        
+                        // Display camera list
+                        const cameraListDiv = document.getElementById('cameraList');
+                        if (data.scrypted.cameras.cameras && data.scrypted.cameras.cameras.length > 0) {
+                            cameraListDiv.innerHTML = data.scrypted.cameras.cameras.map(camera => `
+                                <div class="container-item">
+                                    <div class="container-name">${camera.name}</div>
+                                    <div class="stat">
+                                        <span>Recording:</span>
+                                        <span class="status-badge status-${camera.recording ? 'running' : 'stopped'}">${camera.recording ? 'Yes' : 'No'}</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span>Files:</span>
+                                        <span>${camera.recording_count}</span>
+                                    </div>
+                                    <div class="stat">
+                                        <span>Last:</span>
+                                        <span>${camera.last_recording}</span>
+                                    </div>
+                                </div>
+                            `).join('');
+                        } else {
+                            cameraListDiv.innerHTML = '<div style="text-align: center; opacity: 0.7;">No cameras found</div>';
+                        }
+                    }
+                    
+                    if (data.scrypted && data.scrypted.events) {
+                        document.getElementById('scryptedEventsToday').textContent = data.scrypted.events.today || '0';
+                        document.getElementById('scryptedEventsWeek').textContent = data.scrypted.events.week || '0';
+                    }
+                    
+                    if (data.scrypted && data.scrypted.storage) {
+                        document.getElementById('scryptedStorage').textContent = data.scrypted.storage.size || 'N/A';
+                        document.getElementById('scryptedFiles').textContent = data.scrypted.storage.files || '0';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching stats:', error);
+                    document.getElementById('lastUpdate').textContent = 'Error loading data';
+                });
+        }
+        
+        function updateProgressBar(id, percent) {
+            const element = document.getElementById(id);
+            element.style.width = `${percent}%`;
+            element.textContent = `${percent.toFixed(1)}%`;
+            
+            // Update color based on percentage
+            element.className = 'progress-fill';
+            if (percent < 70) {
+                element.classList.add('progress-ok');
+            } else if (percent < 85) {
+                element.classList.add('progress-warning');
+            } else {
+                element.classList.add('progress-danger');
+            }
+        }
+        
+        // Modal Functions
+        function openBackupModal() {
+            document.getElementById('backupModal').style.display = 'block';
+            document.getElementById('backupLog').textContent = 'Ready to start backup. Select components and click "Start Backup"...';
+        }
+        
+        function closeBackupModal() {
+            document.getElementById('backupModal').style.display = 'none';
+        }
+        
+
+        // Toggle network target input visibility
+        function toggleNetworkInput() {
+            const networkRadio = document.getElementById('targetNetwork');
+            const networkInput = document.getElementById('networkTargetInput');
+            if (networkRadio && networkRadio.checked) {
+                networkInput.style.display = 'block';
+            } else {
+                networkInput.style.display = 'none';
+            }
+        }
+        
+        // Also add event listeners for other radio buttons to hide network input
+        document.addEventListener('DOMContentLoaded', function() {
+            const radios = document.getElementsByName('backupTarget');
+            radios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    if (this.value !== 'network') {
+                        document.getElementById('networkTargetInput').style.display = 'none';
+                    } else {
+                        toggleNetworkInput();
+                    }
+                });
+            });
+        });
+        function executeBackup() {
+            const logDiv = document.getElementById('backupLog');
+            const btn = document.getElementById('startBackupBtn');
+            
+            // Gather selected options
+            const options = {
+                scrypted_config: document.getElementById('backup_scrypted_config').checked,
+                scrypted_metadata: document.getElementById('backup_scrypted_metadata').checked,
+                docker_containers: document.getElementById('backup_docker_containers').checked,
+                docker_volumes: document.getElementById('backup_docker_volumes').checked,
+                dashboard: document.getElementById('backup_dashboard').checked,
+                system_config: document.getElementById('backup_system_config').checked,
+                home_files: document.getElementById('backup_home_files').checked,
+                ssl_certs: document.getElementById('backup_ssl_certs').checked,
+                custom_scripts: document.getElementById('backup_custom_scripts').checked,
+                full_recordings: document.getElementById('backup_full_recordings').checked
+            };
+            
+            // Get selected backup target
+            const targetNVMe = document.getElementById('targetNVMe');
+            const targetUSB = document.getElementById('targetUSB');
+            const targetNetwork = document.getElementById('targetNetwork');
+            let backupTarget = 'nvme'; // default
+            if (targetUSB && targetUSB.checked) backupTarget = 'usb';
+            if (targetNetwork && targetNetwork.checked) backupTarget = 'network';
+            
+            // Get network target if specified
+            const networkTargetPath = document.getElementById('networkTargetPath');
+            const networkTarget = (backupTarget === 'network' && networkTargetPath) ? networkTargetPath.value : '';
+            
+            // Build components array from options
+            const components = [];
+            for (const [key, value] of Object.entries(options)) {
+                if (value) components.push(key);
+            }
+            
+            // Build request payload
+            const payload = {
+                components: components,
+                target: backupTarget
+            };
+            if (networkTarget) {
+                payload.network_target = networkTarget;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Backing up...';
+            logDiv.textContent = '[' + new Date().toLocaleTimeString() + '] Starting backup...\n';
+            
+            // Start backup
+            fetch('/api/backup', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status === 'started') {
+                    // Start polling for log updates
+                    pollBackupLog();
+                } else {
+                    logDiv.textContent += '\n❌ ERROR: ' + data.message;
+                    btn.disabled = false;
+                    btn.textContent = '💾 Start Backup';
+                }
+            })
+            .catch(error => {
+                logDiv.textContent += '\n❌ ERROR: ' + error;
+                btn.disabled = false;
+                btn.textContent = '💾 Start Backup';
+            });
+        }
+        
+        let pollInterval = null;
+        function pollBackupLog() {
+            pollInterval = setInterval(() => {
+                fetch('/api/backup/log', {credentials: 'include'})
+                    .then(response => response.json())
+                    .then(data => {
+                        const logDiv = document.getElementById('backupLog');
+                        logDiv.textContent = data.log;
+                        logDiv.scrollTop = logDiv.scrollHeight;
+                        
+                        if (data.complete) {
+                            clearInterval(pollInterval);
+                            const btn = document.getElementById('startBackupBtn');
+                            btn.disabled = false;
+                            btn.textContent = '💾 Start Backup';
+                            logDiv.textContent += '\n\n✅ BACKUP COMPLETE!';
+                        }
+                    })
+                    .catch(error => console.error('Error polling log:', error));
+            }, 1000);
+        }
+        
+        let selectedBackup = null;
+        
+        function showRestoreView() {
+            document.getElementById('backupView').style.display = 'none';
+            document.getElementById('restoreView').style.display = 'block';
+            document.getElementById('modalTitle').textContent = '♻️ Restore Manager';
+            loadBackupList();
+        }
+        
+        function showBackupView() {
+            document.getElementById('restoreView').style.display = 'none';
+            document.getElementById('backupView').style.display = 'block';
+            document.getElementById('modalTitle').textContent = '💾 Backup & Restore Manager';
+            selectedBackup = null;
+        }
+        
+        // Parse backup filename to extract components
+        function parseBackupComponents(backupName) {
+            const match = backupName.match(/backup_(\d{8})_(\d{6})_?([A-Z]*)/);
+            if (match) {
+                const dateStr = match[1]; // YYYYMMDD
+                const timeStr = match[2]; // HHMMSS
+                const codes = match[3] || '';
+                
+                const year = dateStr.substr(0,4);
+                const month = dateStr.substr(4,2);
+                const day = dateStr.substr(6,2);
+                const hour = timeStr.substr(0,2);
+                const minute = timeStr.substr(2,2);
+                const second = timeStr.substr(4,2);
+                
+                const components = [];
+                const codeMap = {
+                    'SCR': 'Scrypted Config',
+                    'SMD': 'Metadata',
+                    'DCN': 'Containers',
+                    'DVL': 'Volumes',
+                    'DSH': 'Dashboard',
+                    'SYS': 'System',
+                    'SSL': 'SSL Certs',
+                    'CSC': 'Scripts',
+                    'HOM': 'Home',
+                    'REC': 'Recordings'
+                };
+                
+                for (let i = 0; i < codes.length; i += 3) {
+                    const code = codes.substr(i, 3);
+                    if (codeMap[code]) {
+                        components.push({code: code, name: codeMap[code]});
+                    }
+                }
+                
+                return {
+                    timestamp: new Date(year, month-1, day, hour, minute, second),
+                    dateStr: `${year}-${month}-${day}`,
+                    timeStr: `${hour}:${minute}:${second}`,
+                    components: components,
+                    codes: codes
+                };
+            }
+            return null;
+        }
+
+        let allBackups = [];
+        let activeFilters = new Set();
+        let sortOrder = 'desc'; // desc = newest first
+
+        function loadBackupList() {
+            const listDiv = document.getElementById('backupList');
+            listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">Loading backups...</div>';
+            
+            fetch('/api/backup/list', {credentials: 'include'})
+                .then(response => response.json())
+                .then(backups => {
+                    allBackups = backups || [];
+                    renderBackupList();
+                })
+                .catch(error => {
+                    listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f44;">❌ Error: ' + error + '</div>';
+                });
+        }
+
+        function renderBackupList() {
+            const listDiv = document.getElementById('backupList');
+            
+            if (!allBackups || allBackups.length === 0) {
+                listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">No backups found. Create a backup first!</div>';
+                return;
+            }
+
+            // Parse and enrich backups
+            let enrichedBackups = allBackups.map(backup => {
+                const backupName = backup.name || backup;
+                const parsed = parseBackupComponents(backupName);
+                return {
+                    ...backup,
+                    name: backupName,
+                    parsed: parsed,
+                    timestamp: parsed ? parsed.timestamp : new Date(0)
+                };
+            });
+
+            // Apply filters
+            if (activeFilters.size > 0) {
+                enrichedBackups = enrichedBackups.filter(backup => {
+                    if (!backup.parsed) return false;
+                    const backupCodes = backup.parsed.codes;
+                    for (let filter of activeFilters) {
+                        if (backupCodes.includes(filter)) return true;
+                    }
+                    return false;
+                });
+            }
+
+            // Sort by timestamp
+            enrichedBackups.sort((a, b) => {
+                return sortOrder === 'desc' 
+                    ? b.timestamp - a.timestamp 
+                    : a.timestamp - b.timestamp;
+            });
+
+            // Render
+            let html = '<div style="max-height: 300px; overflow-y: auto;">';
+            enrichedBackups.forEach((backup, index) => {
+                const backupSize = backup.size || '?';
+                const backupLocation = backup.location || 'Unknown';
+                const backupPath = backup.path || '';
+                const parsed = backup.parsed;
+                
+                html += '<div class="backup-item" id="backup_' + index + '" onclick="selectBackup(\'' + backup.name + '\', ' + index + ')" style="padding: 12px; margin: 8px 0; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 8px; cursor: pointer;">';
+                html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                html += '<div style="flex: 1;">';
+                html += '<div style="font-weight: bold; margin-bottom: 4px;">📦 ' + backup.name + '</div>';
+                
+                if (parsed) {
+                    html += '<div style="font-size: 0.9em; color: #aaa; margin-bottom: 4px;">📅 ' + parsed.dateStr + ' ' + parsed.timeStr + ' | 💾 ' + backupSize + ' | 📍 ' + backupLocation + '</div>';
+                    
+                    if (parsed.components.length > 0) {
+                        html += '<div style="display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px;">';
+                        parsed.components.forEach(comp => {
+                            html += '<span style="background: rgba(33,150,243,0.2); color: #2196F3; padding: 2px 6px; border-radius: 4px; font-size: 0.75em; font-weight: bold;">' + comp.code + '</span>';
+                        });
+                        html += '</div>';
+                    } else {
+                        html += '<div style="font-size: 0.75em; color: #666; margin-top: 4px;">No component codes (legacy backup)</div>';
+                    }
+                } else {
+                    html += '<div style="font-size: 0.9em; color: #aaa;">💾 ' + backupSize + ' | 📍 ' + backupLocation + '</div>';
+                }
+                
+                html += '<div style="font-size: 0.85em; color: #888; font-family: monospace; margin-top: 4px;">📂 ' + backupPath + '</div>';
+                html += '</div>';
+                html += '<div style="display: flex; align-items: center; gap: 8px;">';
+                html += '<div id="backup_' + index + '_check" style="display: none; color: #4CAF50; font-size: 24px;">✓</div>';
+                html += '<button onclick="deleteBackup(\'' + backupPath + '\', \'' + backup.name + '\', event)" style="background: #f44336; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 0.9em;" title="Delete this backup">🗑️ Delete</button>';
+                html += '</div>';
+                html += '</div></div>';
+            });
+            html += '</div>';
+            
+            if (enrichedBackups.length === 0 && activeFilters.size > 0) {
+                html = '<div style="text-align: center; padding: 20px; color: #999;">No backups match the selected filters</div>';
+            }
+            
+            listDiv.innerHTML = html;
+        }
+
+        function toggleSort() {
+            sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+            document.getElementById('sortBtn').innerHTML = sortOrder === 'desc' 
+                ? '🔽 Newest First' 
+                : '🔼 Oldest First';
+            renderBackupList();
+        }
+
+        function toggleFilter(code) {
+            if (activeFilters.has(code)) {
+                activeFilters.delete(code);
+            } else {
+                activeFilters.add(code);
+            }
+            updateFilterButtons();
+            renderBackupList();
+        }
+
+        function toggleAllFilters(enable) {
+            if (enable) {
+                activeFilters = new Set(['SCR', 'SMD', 'DCN', 'DVL', 'DSH', 'SYS', 'SSL', 'CSC', 'HOM', 'REC']);
+            } else {
+                activeFilters.clear();
+            }
+            updateFilterButtons();
+            renderBackupList();
+        }
+
+        function deleteBackup(backupPath, backupName, event) {
+            event.stopPropagation(); // Prevent selecting the backup
+            
+            if (!confirm(`Are you sure you want to delete backup:\n\n${backupName}\n\nThis action cannot be undone!`)) {
+                return;
+            }
+            
+            fetch('/api/backup/delete', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({backup_path: backupPath})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('✓ ' + data.message);
+                    loadBackupList(); // Reload the backup list
+                } else {
+                    alert('❌ Error: ' + (data.error || 'Failed to delete backup'));
+                }
+            })
+            .catch(error => {
+                alert('❌ Error deleting backup: ' + error);
+            });
+        }
+
+        function updateFilterButtons() {
+            ['SCR', 'SMD', 'DCN', 'DVL', 'DSH', 'SYS', 'SSL', 'CSC', 'HOM', 'REC'].forEach(code => {
+                const btn = document.getElementById('filter_' + code);
+                if (btn) {
+                    btn.style.background = activeFilters.has(code) 
+                        ? 'rgba(33,150,243,0.3)' 
+                        : 'rgba(255,255,255,0.05)';
+                    btn.style.borderColor = activeFilters.has(code) 
+                        ? '#2196F3' 
+                        : 'transparent';
+                }
+            });
+        }
+
+        function restartSystem() {
+            if (!confirm('⚠️ WARNING: This will restart the entire Raspberry Pi.\n\nAll containers (Scrypted, Dashboard) will be restarted.\n\nAre you sure?')) {
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Restarting...';
+            btn.style.background = 'linear-gradient(135deg, #666, #444)';
+            
+            // Call restart API
+            fetch('/api/restart', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'Content-Type': 'application/json'}
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert('🔄 System restart initiated. Dashboard will be unavailable for ~30 seconds.');
+                // Reload page after 35 seconds
+                setTimeout(() => {
+                    window.location.reload();
+                }, 35000);
+            })
+            .catch(error => {
+                alert('❌ Error initiating restart: ' + error);
+                btn.disabled = false;
+                btn.innerHTML = '🔄 Restart System';
+                btn.style.background = 'linear-gradient(135deg, #f44336, #d32f2f)';
+            });
+        }
+
+        function controlContainer(containerName, action) {
+            const actionText = action.charAt(0).toUpperCase() + action.slice(1);
+            if (!confirm(`${actionText} container "${containerName}"?`)) {
+                return;
+            }
+            
+            fetch('/api/container/' + action, {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({container: containerName})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`✓ Container "${containerName}" ${action}ed successfully`);
+                    // Refresh stats after 2 seconds
+                    setTimeout(updateStats, 2000);
+                } else {
+                    alert(`❌ Error: ${data.message}`);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error: ' + error);
+            });
+        }
+
+        function viewLogs(containerName) {
+            fetch('/api/container/logs?container=' + encodeURIComponent(containerName), {credentials: 'include'})
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const logWindow = window.open('', containerName + ' Logs', 'width=800,height=600');
+                    logWindow.document.write(`
+                        <html>
+                        <head>
+                            <title>${containerName} - Logs</title>
+                            <style>
+                                body { background: #1a1a1a; color: #eee; font-family: monospace; padding: 20px; margin: 0; }
+                                pre { white-space: pre-wrap; word-wrap: break-word; }
+                                h1 { color: #2196F3; }
+                            </style>
+                        </head>
+                        <body>
+                            <h1>📋 ${containerName} - Container Logs</h1>
+                            <pre>${data.logs}</pre>
+                        </body>
+                        </html>
+                    `);
+                } else {
+                    alert('❌ Error fetching logs: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('❌ Error: ' + error);
+            });
+        }
+
+
+        function selectBackup(backupName, index) {
+            selectedBackup = backupName;
+            document.querySelectorAll('.backup-item').forEach(item => {
+                item.style.border = '2px solid transparent';
+                item.style.background = 'rgba(255,255,255,0.05)';
+            });
+            document.querySelectorAll('[id$="_check"]').forEach(check => check.style.display = 'none');
+            
+            const selected = document.getElementById('backup_' + index);
+            if (selected) {
+                selected.style.border = '2px solid #4CAF50';
+                selected.style.background = 'rgba(76,175,80,0.1)';
+                document.getElementById('backup_' + index + '_check').style.display = 'block';
+            }
+            
+            document.getElementById('startRestoreBtn').disabled = false;
+            document.getElementById('restoreComponentsSection').style.display = 'block';
+            document.getElementById('restoreLog').textContent = 'Ready to restore from: ' + backupName;
+        }
+        
+        function executeRestore() {
+            if (!selectedBackup) {
+                alert('Please select a backup first!');
+                return;
+            }
+            
+            const logDiv = document.getElementById('restoreLog');
+            const btn = document.getElementById('startRestoreBtn');
+            
+            const components = {};
+            ['scrypted_config', 'scrypted_metadata', 'docker_containers', 'docker_volumes', 'dashboard', 'system_config', 'ssl_certs', 'scripts', 'full_recordings'].forEach(comp => {
+                const el = document.getElementById('restore_' + comp);
+                if (el) components[comp] = el.checked;
+            });
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ Restoring...';
+            logDiv.textContent = '[' + new Date().toLocaleTimeString() + '] Starting restore from: ' + selectedBackup + '\n';
+            
+            fetch('/api/restore', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({backup_name: selectedBackup, components: components})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success || data.status === 'started') {
+                    pollRestoreLog();
+                } else {
+                    logDiv.textContent += '\n❌ ERROR: ' + data.message;
+                    btn.disabled = false;
+                    btn.textContent = '♻️ Start Restore';
+                }
+            })
+            .catch(error => {
+                logDiv.textContent += '\n❌ ERROR: ' + error;
+                btn.disabled = false;
+                btn.textContent = '♻️ Start Restore';
+            });
+        }
+        
+        let restorePollInterval = null;
+        function pollRestoreLog() {
+            restorePollInterval = setInterval(() => {
+                fetch('/api/backup/log', {credentials: 'include'})
+                    .then(response => response.json())
+                    .then(data => {
+                        const logDiv = document.getElementById('restoreLog');
+                        logDiv.textContent = data.log;
+                        logDiv.scrollTop = logDiv.scrollHeight;
+                        
+                        if (data.complete) {
+                            clearInterval(restorePollInterval);
+                            const btn = document.getElementById('startRestoreBtn');
+                            btn.disabled = false;
+                            btn.textContent = '♻️ Start Restore';
+                            if (data.log.includes('SUCCESS')) {
+                                logDiv.textContent += '\n\n✅ RESTORE COMPLETE!';
+                            }
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }, 1000);
+        }
+
+        
+        // Update every 2 seconds
+        updateStats();
+        setInterval(updateStats, 2000);
+    </script>
+    
+    <!-- Backup/Restore Modal -->
+    <div id="backupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 style="margin: 0;" id="modalTitle">💾 Backup & Restore Manager</h2>
+                <span class="modal-close" onclick="closeBackupModal()">&times;</span>
+            </div>
+            
+            <!-- Backup View -->
+            <div id="backupView">
+            <div style="margin-bottom: 20px;">
+                <h3>Select Components to Backup:</h3>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_scrypted_config" checked>
+                        <label for="backup_scrypted_config">📹 Scrypted Configuration</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_scrypted_metadata" checked>
+                        <label for="backup_scrypted_metadata">📄 Recording Metadata</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_docker_containers" checked>
+                        <label for="backup_docker_containers">🐳 Docker Containers</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_docker_volumes" checked>
+                        <label for="backup_docker_volumes">💿 Docker Volumes</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_dashboard" checked>
+                        <label for="backup_dashboard">📊 Dashboard Config</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_system_config" checked>
+                        <label for="backup_system_config">⚙️ System Configuration</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_home_files" checked>
+                        <label for="backup_home_files">🏠 Home Directory Files</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_ssl_certs" checked>
+                        <label for="backup_ssl_certs">🔒 SSL Certificates</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="backup_custom_scripts" checked>
+                        <label for="backup_custom_scripts">📝 Custom Scripts</label>
+                    </div>
+                    <div class="checkbox-item" style="grid-column: 1 / -1; background: rgba(255,152,0,0.1);">
+                        <input type="checkbox" id="backup_full_recordings">
+                        <label for="backup_full_recordings">🎥 Full Video Recordings (⚠️ Very Large)</label>
+                    </div>
+                </div>
+            </div>
+            
+<!-- Backup Target Selection -->
+            <div style="margin: 20px 0; padding: 15px; background: rgba(33, 150, 243, 0.1); border-radius: 8px; border-left: 4px solid #2196F3;">
+                <h3 style="margin-top: 0;">📍 Backup Destination:</h3>
+                <div style="margin-bottom: 15px;">
+                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
+                        <input type="radio" name="backupTarget" id="targetNVMe" value="nvme" style="margin-right: 10px;" checked>
+                        <span>
+                            <strong>💽 NVMe SSD (Local)</strong>
+                            <div style="font-size: 0.9em; color: #aaa; margin-left: 24px;">Fast internal storage - /nvme-backups/</div>
+                        </span>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
+                        <input type="radio" name="backupTarget" id="targetUSB" value="usb" style="margin-right: 10px;">
+                        <span>
+                            <strong>💾 USB SSD (External)</strong>
+                            <div style="font-size: 0.9em; color: #aaa; margin-left: 24px;">External backup drive - /mnt/backup-ssd/backups/</div>
+                        </span>
+                    </label>
+                    
+                    <label style="display: flex; align-items: center; margin-bottom: 10px; cursor: pointer;">
+                        <input type="radio" name="backupTarget" id="targetNetwork" value="network" style="margin-right: 10px;" onchange="toggleNetworkInput()">
+                        <span>
+                            <strong>🌐 Network (MacBook)</strong>
+                            <div style="font-size: 0.9em; color: #aaa; margin-left: 24px;">Remote backup via rsync over SSH</div>
+                        </span>
+                    </label>
+                </div>
+                
+                <!-- Network Target Input (hidden by default) -->
+                <div id="networkTargetInput" style="display: none; margin-top: 10px; margin-left: 24px;">
+                    <label style="display: block; margin-bottom: 5px; font-size: 0.9em; color: #aaa;">Network Target (user@host:/path):</label>
+                    <input type="text" id="networkTargetPath" placeholder="user@192.168.178.45:/Volumes/Backups/pi5" 
+                           style="width: 100%; padding: 8px; background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; font-family: monospace; font-size: 0.9em;">
+                    <div style="font-size: 0.85em; color: #888; margin-top: 5px;">
+                        💡 Tip: Run setup-network-backup.sh first to configure SSH keys
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center;">
+                <button class="action-button primary" id="startBackupBtn" onclick="executeBackup()">
+                    💾 Start Backup
+                </button>
+                <button class="action-button secondary" onclick="showRestoreView()">
+                    🔄 Switch to Restore
+                </button>
+            </div>
+            
+            <div class="log-output" id="backupLog">
+                Ready to start backup. Select components and click "Start Backup"...
+            </div>
+                    </div>
+            </div>
+            
+            <!-- Restore View -->
+            <div id="restoreView" style="display: none;">
+                <div style="margin-bottom: 20px;">
+                    <h3>Select Backup to Restore:</h3>
+                    <!-- Sort and Filter Controls -->
+                    <div style="margin-bottom: 15px; padding: 12px; background: rgba(255,255,255,0.03); border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <div style="font-weight: bold; color: #2196F3;">🔍 Filter & Sort</div>
+                            <button id="sortBtn" onclick="toggleSort()" style="padding: 6px 12px; background: rgba(33,150,243,0.2); border: 1px solid #2196F3; border-radius: 6px; color: #fff; cursor: pointer;">🔽 Newest First</button>
+                        </div>
+                        
+                        <div style="margin-bottom: 8px; color: #aaa; font-size: 0.9em;">Filter by components:</div>
+                        <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px;">
+                            <button id="filter_SCR" onclick="toggleFilter('SCR')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">SCR</button>
+                            <button id="filter_SMD" onclick="toggleFilter('SMD')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">SMD</button>
+                            <button id="filter_DCN" onclick="toggleFilter('DCN')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">DCN</button>
+                            <button id="filter_DVL" onclick="toggleFilter('DVL')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">DVL</button>
+                            <button id="filter_DSH" onclick="toggleFilter('DSH')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">DSH</button>
+                            <button id="filter_SYS" onclick="toggleFilter('SYS')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">SYS</button>
+                            <button id="filter_SSL" onclick="toggleFilter('SSL')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">SSL</button>
+                            <button id="filter_CSC" onclick="toggleFilter('CSC')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">CSC</button>
+                            <button id="filter_HOM" onclick="toggleFilter('HOM')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">HOM</button>
+                            <button id="filter_REC" onclick="toggleFilter('REC')" style="padding: 4px 8px; background: rgba(255,255,255,0.05); border: 2px solid transparent; border-radius: 4px; color: #2196F3; cursor: pointer; font-size: 0.85em; font-weight: bold;">REC</button>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <button onclick="toggleAllFilters(true)" style="padding: 4px 10px; background: rgba(76,175,80,0.2); border: 1px solid #4CAF50; border-radius: 4px; color: #4CAF50; cursor: pointer; font-size: 0.8em;">✓ Check All</button>
+                            <button onclick="toggleAllFilters(false)" style="padding: 4px 10px; background: rgba(244,67,54,0.2); border: 1px solid #f44; border-radius: 4px; color: #f44; cursor: pointer; font-size: 0.8em;">✗ Uncheck All</button>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 15px; padding: 12px; background: rgba(33, 150, 243, 0.1); border-left: 4px solid #2196F3; border-radius: 4px;">
+                        <div style="font-weight: bold; margin-bottom: 8px; color: #2196F3;">📋 Backup Name Components:</div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; font-size: 0.85em; color: #aaa;">
+                            <div><code>SCR</code> - Scrypted Config</div>
+                            <div><code>SMD</code> - Scrypted Metadata</div>
+                            <div><code>DCN</code> - Docker Containers</div>
+                            <div><code>DVL</code> - Docker Volumes</div>
+                            <div><code>DSH</code> - Dashboard</div>
+                            <div><code>SYS</code> - System Config</div>
+                            <div><code>SSL</code> - SSL Certs</div>
+                            <div><code>CSC</code> - Custom Scripts</div>
+                            <div><code>HOM</code> - Home Files</div>
+                            <div><code>REC</code> - Full Recordings</div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px; padding: 12px; background: rgba(33, 150, 243, 0.1); border-left: 4px solid #2196F3; border-radius: 4px;">
+                    <div id="backupList" style="margin-bottom: 15px; max-height: 300px; overflow-y: auto;">
+                        <div style="text-align: center; padding: 20px; color: #999;">Loading backups...</div>
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;" id="restoreComponentsSection" style="display: none;">
+                    <h3>Select Components to Restore:</h3>
+                    <div class="checkbox-group">
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_scrypted_config" checked>
+                            <label for="restore_scrypted_config">📹 Scrypted Configuration</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_scrypted_metadata" checked>
+                            <label for="restore_scrypted_metadata">📄 Recording Metadata</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_docker_containers">
+                            <label for="restore_docker_containers">🐳 Docker Containers</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_docker_volumes">
+                            <label for="restore_docker_volumes">💿 Docker Volumes</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_dashboard">
+                            <label for="restore_dashboard">📊 Dashboard Config</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_system_config">
+                            <label for="restore_system_config">⚙️ System Configuration</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_ssl_certs">
+                            <label for="restore_ssl_certs">🔒 SSL Certificates</label>
+                        </div>
+                        <div class="checkbox-item">
+                            <input type="checkbox" id="restore_scripts">
+                            <label for="restore_scripts">📝 Custom Scripts</label>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <button class="action-button primary" id="startRestoreBtn" onclick="executeRestore()" disabled>
+                        ♻️ Start Restore
+                    </button>
+                    <button class="action-button secondary" onclick="showBackupView()">
+                        ⬅️ Back to Backup
+                    </button>
+                </div>
+                
+                <div class="log-output" id="restoreLog">
+                    Select a backup from the list above to restore...
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

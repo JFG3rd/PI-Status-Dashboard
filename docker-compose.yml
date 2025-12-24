@@ -1,0 +1,32 @@
+services:
+  status-dashboard:
+    build: .
+    container_name: pi5-status-dashboard
+    restart: unless-stopped
+    ports:
+      - "8443:8443"
+    volumes:
+      # Mount Docker socket to read container stats
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mount system files for monitoring
+      - /sys:/host/sys:ro
+      - /proc:/host/proc:ro
+      # Mount dev for device access (including SD card)
+      - /dev:/host/dev:ro
+      # Mount boot partition (SD card)
+      - /boot/firmware:/boot/firmware:ro
+      # Mount home for backup scripts
+      - /home/jessegreene:/home/jessegreene
+      # Mount backup SSD
+      - /mnt/backup-ssd:/mnt/backup-ssd
+      # Mount Scrypted NVR directory
+      - /scrypted/nvr:/scrypted/nvr:ro
+      # SSL certificates
+      - /etc/ssl/dashboard:/etc/ssl/dashboard:ro
+      # PAM authentication (read-only shadow file)
+      - /etc/shadow:/etc/shadow:ro
+      - /etc/passwd:/etc/passwd:ro
+    environment:
+      - TZ=Europe/Berlin
+      - DOCKER_HOST=unix:///var/run/docker.sock
+    privileged: true
