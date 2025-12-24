@@ -68,4 +68,6 @@ docker-compose up -d
 - Docker: gated on docker CLI availability; Scrypted card appears only when the `scrypted` container is running.
 
 ## Screenshots
-Refer to the provided UI captures for the System, Storage, Backup Manager, and Restore Manager cards.
+- Main dashboard: [status-dashboard/docs/screenshots/PIStatus-MainPage.png](status-dashboard/docs/screenshots/PIStatus-MainPage.png)
+- Backup Manager modal: [status-dashboard/docs/screenshots/PIStatus-BackupPage.png](status-dashboard/docs/screenshots/PIStatus-BackupPage.png)
+- Restore Manager modal: [status-dashboard/docs/screenshots/PIStatus-RestorePage.png](status-dashboard/docs/screenshots/PIStatus-RestorePage.png)
