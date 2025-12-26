@@ -755,6 +755,10 @@
                     <span class="stat-label">Host IP:</span>
                     <span class="stat-value" id="ipAddress">--</span>
                 </div>
+                <div class="stat" id="ipAssignmentRow" style="display: none;">
+                    <span class="stat-label">Assignment:</span>
+                    <span class="stat-value" id="ipAssignment">--</span>
+                </div>
                 <div class="stat" id="containerIpRow" style="display: none;">
                     <span class="stat-label">Container IP:</span>
                     <span class="stat-value" id="containerIp">--</span>
@@ -1005,6 +1009,15 @@
                     document.getElementById('ipAddress').textContent = data.network.ip;
                     document.getElementById('netRx').textContent = data.network.rx;
                     document.getElementById('netTx').textContent = data.network.tx;
+
+                    // Assignment source (DHCP/static/override)
+                    const ipAssignmentRow = document.getElementById('ipAssignmentRow');
+                    if (data.network.assignment) {
+                        document.getElementById('ipAssignment').textContent = data.network.assignment.toUpperCase();
+                        ipAssignmentRow.style.display = 'flex';
+                    } else if (ipAssignmentRow) {
+                        ipAssignmentRow.style.display = 'none';
+                    }
 
                     // Container IP (from inside container)
                     const containerIpRow = document.getElementById('containerIpRow');

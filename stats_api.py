@@ -189,16 +189,16 @@ def host_ip_from_proc():
             candidate = filtered[0]
     except Exception:
         candidate = None
-    return candidate
+    return candidate, None
 
 
 def host_ip_from_nsenter():
-    """Use nsenter to query host net namespace for global IPv4 addresses"""
+    """Use nsenter to query host net namespace for global IPv4 addresses and detect DHCP"""
     try:
         cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'scope', 'global']
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
         if result.returncode != 0:
-            return None
+            return None, None
         lines = result.stdout.split('\n')
         ips = []
         for line in lines:
@@ -214,12 +214,13 @@ def host_ip_from_nsenter():
                         continue
                     if ip_only.startswith('169.254.'):
                         continue
-                    ips.append(ip_only)
+                    source = 'dhcp' if 'dynamic' in parts else 'static'
+                    ips.append((ip_only, source))
         if ips:
             return ips[0]
     except Exception:
-        return None
-    return None
+        return None, None
+    return None, None
 
 
 class StatsHandler(BaseHTTPRequestHandler):
@@ -709,7 +710,21 @@ class StatsHandler(BaseHTTPRequestHandler):
     def get_network_stats(self):
         """Get network stats"""
         detected_container_ip = auto_detect_ip()
-        host_ip = IP_OVERRIDE or host_ip_from_proc() or host_ip_from_nsenter() or detected_container_ip or 'Unknown'
+
+        proc_ip, proc_source = host_ip_from_proc()
+        nsenter_ip, nsenter_source = host_ip_from_nsenter()
+
+        host_ip = IP_OVERRIDE or proc_ip or nsenter_ip or detected_container_ip or 'Unknown'
+
+        # Determine assignment source
+        if IP_OVERRIDE:
+            assignment = 'static (override)'
+        elif nsenter_source:
+            assignment = nsenter_source
+        elif proc_ip:
+            assignment = 'unknown'
+        else:
+            assignment = 'unknown'
         
         rx_bytes = 0
         tx_bytes = 0
@@ -741,6 +756,7 @@ class StatsHandler(BaseHTTPRequestHandler):
             'rx': f"{rx_bytes / (1024**3):.2f} GB",
             'tx': f"{tx_bytes / (1024**3):.2f} GB",
             'config': config_block,
+            'assignment': assignment,
             'ports': {
                 'dashboard_https': 8443,
                 'backup_api_internal': 8081
