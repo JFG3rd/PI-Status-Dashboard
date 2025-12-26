@@ -223,6 +223,43 @@ def host_ip_from_nsenter():
     return None, None
 
 
+def host_ip_via_route():
+    """Prefer default route interface to pick IP (host namespace)"""
+    try:
+        route_cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', 'route', 'show', 'default']
+        route_res = subprocess.run(route_cmd, capture_output=True, text=True, timeout=2)
+        if route_res.returncode != 0:
+            return None, None
+        line = route_res.stdout.strip().split('\n')[0] if route_res.stdout else ''
+        if not line:
+            return None, None
+        parts = line.split()
+        if 'dev' not in parts:
+            return None, None
+        dev_idx = parts.index('dev') + 1
+        if dev_idx >= len(parts):
+            return None, None
+        iface = parts[dev_idx]
+        addr_cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'dev', iface, 'scope', 'global']
+        addr_res = subprocess.run(addr_cmd, capture_output=True, text=True, timeout=2)
+        if addr_res.returncode != 0:
+            return None, None
+        lines = addr_res.stdout.split('\n')
+        for l in lines:
+            l = l.strip()
+            if l.startswith('inet '):
+                parts = l.split()
+                cidr = parts[1]
+                ip_only = cidr.split('/')[0]
+                if ip_only.startswith(('127.', '169.254.', '172.17.', '172.18.', '172.19.')):
+                    continue
+                source = 'dhcp' if 'dynamic' in parts else 'static'
+                return ip_only, source
+    except Exception:
+        return None, None
+    return None, None
+
+
 class StatsHandler(BaseHTTPRequestHandler):
     def check_auth(self):
         """Check HTTP Basic Authentication using PAM"""
@@ -711,14 +748,17 @@ class StatsHandler(BaseHTTPRequestHandler):
         """Get network stats"""
         detected_container_ip = auto_detect_ip()
 
+        route_ip, route_source = host_ip_via_route()
         proc_ip, proc_source = host_ip_from_proc()
         nsenter_ip, nsenter_source = host_ip_from_nsenter()
 
-        host_ip = IP_OVERRIDE or proc_ip or nsenter_ip or detected_container_ip or 'Unknown'
+        host_ip = IP_OVERRIDE or route_ip or proc_ip or nsenter_ip or detected_container_ip or 'Unknown'
 
         # Determine assignment source
         if IP_OVERRIDE:
             assignment = 'static (override)'
+        elif route_source:
+            assignment = route_source
         elif nsenter_source:
             assignment = nsenter_source
         elif proc_ip:
@@ -757,6 +797,7 @@ class StatsHandler(BaseHTTPRequestHandler):
             'tx': f"{tx_bytes / (1024**3):.2f} GB",
             'config': config_block,
             'assignment': assignment,
+            'dhcp': assignment == 'dhcp',
             'ports': {
                 'dashboard_https': 8443,
                 'backup_api_internal': 8081

@@ -759,6 +759,10 @@
                     <span class="stat-label">Assignment:</span>
                     <span class="stat-value" id="ipAssignment">--</span>
                 </div>
+                <div class="stat" id="dhcpRow" style="display: none;">
+                    <span class="stat-label">DHCP:</span>
+                    <span class="stat-value" id="dhcpFlag">--</span>
+                </div>
                 <div class="stat" id="containerIpRow" style="display: none;">
                     <span class="stat-label">Container IP:</span>
                     <span class="stat-value" id="containerIp">--</span>
@@ -1017,6 +1021,15 @@
                         ipAssignmentRow.style.display = 'flex';
                     } else if (ipAssignmentRow) {
                         ipAssignmentRow.style.display = 'none';
+                    }
+
+                    // DHCP flag
+                    const dhcpRow = document.getElementById('dhcpRow');
+                    if (data.network.hasOwnProperty('dhcp')) {
+                        document.getElementById('dhcpFlag').textContent = data.network.dhcp ? 'TRUE' : 'FALSE';
+                        dhcpRow.style.display = 'flex';
+                    } else if (dhcpRow) {
+                        dhcpRow.style.display = 'none';
                     }
 
                     // Container IP (from inside container)
