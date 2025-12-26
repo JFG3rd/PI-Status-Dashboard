@@ -37,6 +37,14 @@ docker-compose up -d
   - `/scrypted/nvr` read-only for NVR stats
   - `/etc/shadow`, `/etc/passwd` read-only for PAM auth
 
+### Environment configuration (.env)
+The compose file now loads a `.env` (see the sample checked in). Key variables:
+- `DASHBOARD_IP_OVERRIDE` — force the IP shown on the Network card (otherwise auto-detected).
+- `DASHBOARD_STATIC_IP`, `DASHBOARD_STATIC_GATEWAY`, `DASHBOARD_STATIC_SUBNET` — optional static network info to display.
+- `NETWORK_INTERFACE_PRIORITY` — comma list for IP auto-detect preference (default `eth0,end0,wlan0`).
+- `BACKUP_DEFAULT_PATH` — path shown in the Backup card (default `/mnt/backup-ssd/backups`).
+- `TZ` — timezone (default `Europe/Berlin`).
+
 ## Quick Run Commands
 - One-liner deploy: `cd /home/jessegreene/status-dashboard && docker-compose up -d --build`
 - Logs: `docker logs -f pi5-status-dashboard`

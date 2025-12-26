@@ -12,6 +12,7 @@ import os
 import time
 import ssl
 import base64
+import socket
 from datetime import timedelta
 
 # PAM authentication
@@ -30,6 +31,14 @@ CACHE_DURATION = 5
 HARDWARE_CACHE = None
 HARDWARE_CACHE_TIME = 0
 HARDWARE_CACHE_DURATION = 30  # Re-detect every 30 seconds
+
+# Configurable paths and network overrides
+NETWORK_INTERFACE_PRIORITY = os.getenv('NETWORK_INTERFACE_PRIORITY', 'eth0,end0,wlan0').split(',')
+IP_OVERRIDE = os.getenv('DASHBOARD_IP_OVERRIDE')
+STATIC_IP = os.getenv('DASHBOARD_STATIC_IP')
+STATIC_GATEWAY = os.getenv('DASHBOARD_STATIC_GATEWAY')
+STATIC_SUBNET = os.getenv('DASHBOARD_STATIC_SUBNET')
+BACKUP_DEFAULT_PATH = os.getenv('BACKUP_DEFAULT_PATH', '/mnt/backup-ssd/backups')
 
 # Import Scrypted stats module
 try:
@@ -128,6 +137,35 @@ def detect_hardware():
     HARDWARE_CACHE = hardware
     HARDWARE_CACHE_TIME = current_time
     return hardware
+
+
+def auto_detect_ip():
+    """Detect the primary IP address (non-loopback)"""
+    # Try socket trick to discover the source IP used for outbound traffic
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(('1.1.1.1', 80))
+            return s.getsockname()[0]
+    except Exception:
+        pass
+    # Fall back to interface scan with priority order
+    try:
+        addrs = psutil.net_if_addrs()
+        for iface in NETWORK_INTERFACE_PRIORITY:
+            iface = iface.strip()
+            if not iface or iface not in addrs:
+                continue
+            for snic in addrs.get(iface, []):
+                if snic.family == socket.AF_INET and not snic.address.startswith('127.'):
+                    return snic.address
+        # Any other non-loopback
+        for if_addrs in addrs.values():
+            for snic in if_addrs:
+                if snic.family == socket.AF_INET and not snic.address.startswith('127.'):
+                    return snic.address
+    except Exception:
+        pass
+    return None
 
 
 class StatsHandler(BaseHTTPRequestHandler):
@@ -455,7 +493,10 @@ class StatsHandler(BaseHTTPRequestHandler):
             'memory': self.get_memory_stats(),
             'disk': self.get_disk_stats(hardware),
             'network': self.get_network_stats(),
-            'system': self.get_system_info()
+            'system': self.get_system_info(),
+            'backup_config': {
+                'default_path': BACKUP_DEFAULT_PATH
+            }
         }
         
         if hardware['docker']:
@@ -613,7 +654,7 @@ class StatsHandler(BaseHTTPRequestHandler):
     
     def get_network_stats(self):
         """Get network stats"""
-        ip = "192.168.178.31"
+        detected_ip = IP_OVERRIDE or auto_detect_ip() or 'Unknown'
         
         rx_bytes = 0
         tx_bytes = 0
@@ -631,10 +672,19 @@ class StatsHandler(BaseHTTPRequestHandler):
             rx_bytes = net_io.bytes_recv
             tx_bytes = net_io.bytes_sent
         
+        config_block = {}
+        if STATIC_IP:
+            config_block['ip'] = STATIC_IP
+        if STATIC_GATEWAY:
+            config_block['gateway'] = STATIC_GATEWAY
+        if STATIC_SUBNET:
+            config_block['subnet'] = STATIC_SUBNET
+
         return {
-            'ip': ip,
+            'ip': detected_ip,
             'rx': f"{rx_bytes / (1024**3):.2f} GB",
-            'tx': f"{tx_bytes / (1024**3):.2f} GB"
+            'tx': f"{tx_bytes / (1024**3):.2f} GB",
+            'config': config_block
         }
 
     def get_docker_stats(self):

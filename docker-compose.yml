@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     ports:
       - "8443:8443"
+    env_file:
+      - .env
     volumes:
       # Mount Docker socket to read container stats
       - /var/run/docker.sock:/var/run/docker.sock:ro

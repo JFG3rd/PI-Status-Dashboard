@@ -726,6 +726,10 @@
                     <span class="stat-label">Total Size:</span>
                     <span class="stat-value" id="backupTotalSize">--</span>
                 </div>
+                <div class="stat" id="backupPathRow" style="display: none;">
+                    <span class="stat-label">Default Path:</span>
+                    <span class="stat-value" id="backupPath">--</span>
+                </div>
                 
                 <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255,255,255,0.1);">
                     <h3 style="font-size: 0.9em; margin-bottom: 10px; color: #64b5f6;">Backups by Location</h3>
@@ -750,6 +754,18 @@
                 <div class="stat">
                     <span class="stat-label">IP Address:</span>
                     <span class="stat-value" id="ipAddress">--</span>
+                </div>
+                <div class="stat" id="staticIpRow" style="display: none;">
+                    <span class="stat-label">Configured IP:</span>
+                    <span class="stat-value" id="staticIp">--</span>
+                </div>
+                <div class="stat" id="staticGatewayRow" style="display: none;">
+                    <span class="stat-label">Gateway:</span>
+                    <span class="stat-value" id="staticGateway">--</span>
+                </div>
+                <div class="stat" id="staticSubnetRow" style="display: none;">
+                    <span class="stat-label">Subnet:</span>
+                    <span class="stat-value" id="staticSubnet">--</span>
                 </div>
                 <div class="stat">
                     <span class="stat-label">RX (Received):</span>
@@ -981,6 +997,39 @@
                     document.getElementById('ipAddress').textContent = data.network.ip;
                     document.getElementById('netRx').textContent = data.network.rx;
                     document.getElementById('netTx').textContent = data.network.tx;
+
+                    // Static network config (optional)
+                    const config = data.network.config || {};
+                    const staticIpRow = document.getElementById('staticIpRow');
+                    const staticGatewayRow = document.getElementById('staticGatewayRow');
+                    const staticSubnetRow = document.getElementById('staticSubnetRow');
+                    if (config.ip) {
+                        document.getElementById('staticIp').textContent = config.ip;
+                        staticIpRow.style.display = 'flex';
+                    } else if (staticIpRow) {
+                        staticIpRow.style.display = 'none';
+                    }
+                    if (config.gateway) {
+                        document.getElementById('staticGateway').textContent = config.gateway;
+                        staticGatewayRow.style.display = 'flex';
+                    } else if (staticGatewayRow) {
+                        staticGatewayRow.style.display = 'none';
+                    }
+                    if (config.subnet) {
+                        document.getElementById('staticSubnet').textContent = config.subnet;
+                        staticSubnetRow.style.display = 'flex';
+                    } else if (staticSubnetRow) {
+                        staticSubnetRow.style.display = 'none';
+                    }
+
+                    // Backup default path (from /api/stats)
+                    const backupPathRow = document.getElementById('backupPathRow');
+                    if (data.backup_config && data.backup_config.default_path) {
+                        document.getElementById('backupPath').textContent = data.backup_config.default_path;
+                        backupPathRow.style.display = 'flex';
+                    } else if (backupPathRow) {
+                        backupPathRow.style.display = 'none';
+                    }
                     
                     // Docker Containers
                     const dockerDiv = document.getElementById('dockerContainers');
