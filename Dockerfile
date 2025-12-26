@@ -4,6 +4,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     procps \
     curl \
+    iproute2 \
     libpam0g-dev \
     libcrypt1 \
     && curl -fsSL https://get.docker.com -o get-docker.sh \

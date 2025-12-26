@@ -45,6 +45,8 @@ The compose file now loads a `.env` (see the sample checked in). Key variables:
 - `BACKUP_DEFAULT_PATH` — path shown in the Backup card (default `/mnt/backup-ssd/backups`).
 - `TZ` — timezone (default `Europe/Berlin`).
 
+IP detection notes: the dashboard now tries (in order) `DASHBOARD_IP_OVERRIDE`, host `/host/proc/net/fib_trie`, host net namespace via `nsenter ip -4 addr`, then container IP. If detection is wrong (e.g., Docker bridge), set `DASHBOARD_IP_OVERRIDE` in `.env` to the LAN IP.
+
 ## Quick Run Commands
 - One-liner deploy: `cd /home/jessegreene/status-dashboard && docker-compose up -d --build`
 - Logs: `docker logs -f pi5-status-dashboard`

@@ -192,6 +192,36 @@ def host_ip_from_proc():
     return candidate
 
 
+def host_ip_from_nsenter():
+    """Use nsenter to query host net namespace for global IPv4 addresses"""
+    try:
+        cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'scope', 'global']
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+        if result.returncode != 0:
+            return None
+        lines = result.stdout.split('\n')
+        ips = []
+        for line in lines:
+            line = line.strip()
+            if line.startswith('inet '):
+                parts = line.split()
+                if len(parts) >= 2:
+                    cidr = parts[1]
+                    ip_only = cidr.split('/')[0]
+                    if ip_only.startswith('127.'):
+                        continue
+                    if ip_only.startswith('172.17.') or ip_only.startswith('172.18.') or ip_only.startswith('172.19.'):
+                        continue
+                    if ip_only.startswith('169.254.'):
+                        continue
+                    ips.append(ip_only)
+        if ips:
+            return ips[0]
+    except Exception:
+        return None
+    return None
+
+
 class StatsHandler(BaseHTTPRequestHandler):
     def check_auth(self):
         """Check HTTP Basic Authentication using PAM"""
@@ -679,7 +709,7 @@ class StatsHandler(BaseHTTPRequestHandler):
     def get_network_stats(self):
         """Get network stats"""
         detected_container_ip = auto_detect_ip()
-        host_ip = IP_OVERRIDE or host_ip_from_proc() or detected_container_ip or 'Unknown'
+        host_ip = IP_OVERRIDE or host_ip_from_proc() or host_ip_from_nsenter() or detected_container_ip or 'Unknown'
         
         rx_bytes = 0
         tx_bytes = 0
