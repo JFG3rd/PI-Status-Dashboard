@@ -170,12 +170,60 @@ def auto_detect_ip():
     return None
 
 
-def get_container_name():
-    """Best-effort container name for display"""
+CONTAINER_NAME_CACHE = None
+CONTAINER_ID_CACHE = None
+
+
+def _detect_container_identity():
+    """Discover container name and id using Docker; cache result."""
+    global CONTAINER_NAME_CACHE, CONTAINER_ID_CACHE
+
+    if CONTAINER_NAME_CACHE and CONTAINER_ID_CACHE:
+        return CONTAINER_NAME_CACHE, CONTAINER_ID_CACHE
+
+    # Allow manual override via env if set
+    env_name = os.environ.get('CONTAINER_NAME')
+    if env_name:
+        CONTAINER_NAME_CACHE = env_name
+        CONTAINER_ID_CACHE = os.environ.get('HOSTNAME') or env_name
+        return CONTAINER_NAME_CACHE, CONTAINER_ID_CACHE
+
+    container_id = None
     try:
-        return os.environ.get('HOSTNAME') or socket.gethostname() or 'container'
+        # Extract container ID from cgroup to identify ourselves
+        with open('/proc/self/cgroup', 'r') as f:
+            for line in f:
+                parts = line.strip().split('/')
+                if len(parts) >= 3 and parts[-1]:
+                    candidate = parts[-1]
+                    # Docker IDs are long hex strings
+                    if re.fullmatch(r'[0-9a-f]{12,64}', candidate):
+                        container_id = candidate
+                        break
     except Exception:
-        return 'container'
+        pass
+
+    container_name = None
+    if container_id:
+        try:
+            result = subprocess.run(
+                ['docker', 'inspect', '--format', '{{.Name}}', container_id],
+                capture_output=True, text=True, timeout=2
+            )
+            if result.returncode == 0 and result.stdout:
+                container_name = result.stdout.strip().lstrip('/') or None
+        except Exception:
+            pass
+
+    if not container_name:
+        try:
+            container_name = socket.gethostname()
+        except Exception:
+            container_name = 'container'
+
+    CONTAINER_NAME_CACHE = container_name
+    CONTAINER_ID_CACHE = container_id or container_name
+    return CONTAINER_NAME_CACHE, CONTAINER_ID_CACHE
 
 
 def host_ip_from_proc():
@@ -865,10 +913,13 @@ class StatsHandler(BaseHTTPRequestHandler):
         if host_ip and host_ip != 'Unknown' and not IP_OVERRIDE:
             suggested_env = f"DASHBOARD_IP_OVERRIDE={host_ip}"
 
+        container_name, container_id = _detect_container_identity()
+
         return {
             'ip': host_ip,
             'container_ip': detected_container_ip or 'Unknown',
-            'container_name': get_container_name(),
+            'container_name': container_name,
+            'container_id': container_id,
             'rx': f"{rx_bytes / (1024**3):.2f} GB",
             'tx': f"{tx_bytes / (1024**3):.2f} GB",
             'config': config_block,
@@ -886,6 +937,20 @@ class StatsHandler(BaseHTTPRequestHandler):
     def get_docker_stats(self):
         """Get Docker stats"""
         try:
+            # Map container names to IDs for display when names are not friendly elsewhere
+            id_lookup = {}
+            try:
+                ps_output = subprocess.run(
+                    ['docker', 'ps', '--no-trunc', '--format', '{{.Names}}|{{.ID}}'],
+                    capture_output=True, text=True, timeout=3
+                )
+                for line in ps_output.stdout.strip().split('\n'):
+                    if '|' in line:
+                        name, cid = line.split('|', 1)
+                        id_lookup[name] = cid
+            except Exception:
+                pass
+
             result = subprocess.run(
                 ['docker', 'stats', '--no-stream', '--format', 
                  '{{.Name}}|{{.CPUPerc}}|{{.MemUsage}}|{{.MemPerc}}|{{.NetIO}}|{{.BlockIO}}'],
@@ -902,8 +967,10 @@ class StatsHandler(BaseHTTPRequestHandler):
                     
                 parts = line.split('|')
                 if len(parts) >= 4:
+                        cid = id_lookup.get(parts[0])
                     containers.append({
                         'name': parts[0],
+                            'id': cid,
                         'cpu': parts[1],
                         'memory': parts[2],
                         'mem_percent': parts[3],
