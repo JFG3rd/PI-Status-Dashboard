@@ -967,10 +967,10 @@ class StatsHandler(BaseHTTPRequestHandler):
                     
                 parts = line.split('|')
                 if len(parts) >= 4:
-                        cid = id_lookup.get(parts[0])
+                    cid = id_lookup.get(parts[0])
                     containers.append({
                         'name': parts[0],
-                            'id': cid,
+                        'id': cid,
                         'cpu': parts[1],
                         'memory': parts[2],
                         'mem_percent': parts[3],
