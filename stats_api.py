@@ -170,6 +170,14 @@ def auto_detect_ip():
     return None
 
 
+def get_container_name():
+    """Best-effort container name for display"""
+    try:
+        return os.environ.get('HOSTNAME') or socket.gethostname() or 'container'
+    except Exception:
+        return 'container'
+
+
 def host_ip_from_proc():
     """Parse host IPs from mounted /host/proc/net/fib_trie and pick a likely LAN IP"""
     candidate = None
@@ -860,6 +868,7 @@ class StatsHandler(BaseHTTPRequestHandler):
         return {
             'ip': host_ip,
             'container_ip': detected_container_ip or 'Unknown',
+            'container_name': get_container_name(),
             'rx': f"{rx_bytes / (1024**3):.2f} GB",
             'tx': f"{tx_bytes / (1024**3):.2f} GB",
             'config': config_block,

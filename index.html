@@ -72,6 +72,28 @@
             margin: 12px 0;
             padding: 8px 0;
         }
+
+        .network-card .stat {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+            margin: 10px 0;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .network-card .stat:last-of-type {
+            border-bottom: none;
+        }
+
+        .network-card .stat-label {
+            opacity: 0.8;
+            font-size: 0.95em;
+        }
+
+        .network-card .stat-value {
+            font-size: 1.05em;
+        }
         
         .stat-label {
             opacity: 0.9;
@@ -749,19 +771,11 @@
             </div>
             
             <!-- Network Stats -->
-            <div class="card">
+            <div class="card network-card">
                 <h2>🌐 Network</h2>
                 <div class="stat">
                     <span class="stat-label">Host IP:</span>
                     <span class="stat-value" id="ipAddress">--</span>
-                </div>
-                <div class="stat" id="ipAssignmentRow" style="display: none;">
-                    <span class="stat-label">Host IP Assignment:</span>
-                    <span class="stat-value" id="ipAssignment">--</span>
-                </div>
-                <div class="stat" id="dhcpRow" style="display: none;">
-                    <span class="stat-label">DHCP:</span>
-                    <span class="stat-value" id="dhcpFlag">--</span>
                 </div>
                 <div class="stat" id="gatewayRow" style="display: none;">
                     <span class="stat-label">Gateway:</span>
@@ -771,8 +785,16 @@
                     <span class="stat-label">Subnet:</span>
                     <span class="stat-value" id="subnet">--</span>
                 </div>
+                <div class="stat" id="ipAssignmentRow" style="display: none;">
+                    <span class="stat-label">Host IP Assignment:</span>
+                    <span class="stat-value" id="ipAssignment">--</span>
+                </div>
+                <div class="stat" id="dhcpRow" style="display: none;">
+                    <span class="stat-label">DHCP:</span>
+                    <span class="stat-value" id="dhcpFlag">--</span>
+                </div>
                 <div class="stat" id="containerIpRow" style="display: none;">
-                    <span class="stat-label">Container IP:</span>
+                    <span class="stat-label" id="containerIpLabel">Container IP:</span>
                     <span class="stat-value" id="containerIp">--</span>
                 </div>
                 <div class="stat" id="staticIpRow" style="display: none;">
@@ -780,11 +802,11 @@
                     <span class="stat-value" id="staticIp">--</span>
                 </div>
                 <div class="stat" id="staticGatewayRow" style="display: none;">
-                    <span class="stat-label">Gateway:</span>
+                    <span class="stat-label">Configured Gateway:</span>
                     <span class="stat-value" id="staticGateway">--</span>
                 </div>
                 <div class="stat" id="staticSubnetRow" style="display: none;">
-                    <span class="stat-label">Subnet:</span>
+                    <span class="stat-label">Configured Subnet:</span>
                     <span class="stat-value" id="staticSubnet">--</span>
                 </div>
                 <div class="stat">
@@ -1061,6 +1083,11 @@
                     }
 
                     // Container IP (from inside container)
+                    const containerLabel = document.getElementById('containerIpLabel');
+                    if (containerLabel) {
+                        const containerName = data.network.container_name || 'dashboard';
+                        containerLabel.textContent = `Container IP (${containerName}):`;
+                    }
                     const containerIpRow = document.getElementById('containerIpRow');
                     if (data.network.container_ip) {
                         document.getElementById('containerIp').textContent = data.network.container_ip;
