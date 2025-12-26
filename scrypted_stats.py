@@ -111,21 +111,20 @@ def get_scrypted_container_stats():
         return {'status': 'error', 'uptime': 'N/A', 'started': 'N/A'}
 
 def get_all_scrypted_stats():
-    # Return minimal data for speed - full stats can be loaded later
+    # Collect real Scrypted stats (cameras, events, storage, container)
     try:
-        container = get_scrypted_container_stats()
         return {
-            'cameras': {'count': 0, 'status': 'Loading...'},
-            'events': [],
-            'storage': {'status': 'Loading...'},
-            'container': container
+            'cameras': get_scrypted_cameras(),
+            'events': get_scrypted_events(),
+            'storage': get_scrypted_storage(),
+            'container': get_scrypted_container_stats()
         }
     except:
         return {
-            'cameras': {'count': 0},
-            'events': [],
-            'storage': {},
-            'container': {}
+            'cameras': {'cameras': [], 'total': 0, 'recording': 0},
+            'events': {'today': 0, 'week': 0},
+            'storage': {'size': 'N/A', 'files': 0},
+            'container': {'status': 'error', 'uptime': 'N/A', 'started': 'N/A'}
         }
 
 if __name__ == '__main__':
