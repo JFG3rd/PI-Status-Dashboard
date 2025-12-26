@@ -39,13 +39,12 @@ docker-compose up -d
 
 ### Environment configuration (.env)
 The compose file now loads a `.env` (see the sample checked in). Key variables:
-- `DASHBOARD_IP_OVERRIDE` — force the IP shown on the Network card (otherwise auto-detected).
-- `DASHBOARD_STATIC_IP`, `DASHBOARD_STATIC_GATEWAY`, `DASHBOARD_STATIC_SUBNET` — optional static network info to display.
+- `DASHBOARD_IP_OVERRIDE` — only use if auto-detect is wrong; forces the Host IP shown.
 - `NETWORK_INTERFACE_PRIORITY` — comma list for IP auto-detect preference (default `eth0,end0,wlan0`).
 - `BACKUP_DEFAULT_PATH` — path shown in the Backup card (default `/mnt/backup-ssd/backups`).
 - `TZ` — timezone (default `Europe/Berlin`).
 
-IP detection notes: the dashboard now tries (in order) `DASHBOARD_IP_OVERRIDE`, host `/host/proc/net/fib_trie`, host net namespace via `nsenter ip -4 addr`, then container IP. If detection is wrong (e.g., Docker bridge), set `DASHBOARD_IP_OVERRIDE` in `.env` to the LAN IP.
+IP detection notes: the dashboard now tries (in order) `DASHBOARD_IP_OVERRIDE`, host default route (nsenter + ip route/addr) to get IP/gateway/subnet and DHCP flag, then proc/nsenter fallbacks, then container IP. If it still shows 0.0.0.0, set `DASHBOARD_IP_OVERRIDE` in `.env` to the LAN IP.
 
 ## Quick Run Commands
 - One-liner deploy: `cd /home/jessegreene/status-dashboard && docker-compose up -d --build`

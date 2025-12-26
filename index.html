@@ -756,12 +756,20 @@
                     <span class="stat-value" id="ipAddress">--</span>
                 </div>
                 <div class="stat" id="ipAssignmentRow" style="display: none;">
-                    <span class="stat-label">Assignment:</span>
+                    <span class="stat-label">Host IP Assignment:</span>
                     <span class="stat-value" id="ipAssignment">--</span>
                 </div>
                 <div class="stat" id="dhcpRow" style="display: none;">
                     <span class="stat-label">DHCP:</span>
                     <span class="stat-value" id="dhcpFlag">--</span>
+                </div>
+                <div class="stat" id="gatewayRow" style="display: none;">
+                    <span class="stat-label">Gateway:</span>
+                    <span class="stat-value" id="gateway">--</span>
+                </div>
+                <div class="stat" id="subnetRow" style="display: none;">
+                    <span class="stat-label">Subnet:</span>
+                    <span class="stat-value" id="subnet">--</span>
                 </div>
                 <div class="stat" id="containerIpRow" style="display: none;">
                     <span class="stat-label">Container IP:</span>
@@ -790,6 +798,10 @@
                 <div class="stat" id="portsRow" style="display: none;">
                     <span class="stat-label">Ports:</span>
                     <span class="stat-value" id="portsInfo">--</span>
+                </div>
+                <div class="stat" id="suggestedEnvRow" style="display: none;">
+                    <span class="stat-label">Suggested .env:</span>
+                    <span class="stat-value" id="suggestedEnv">--</span>
                 </div>
             </div>
             
@@ -1032,6 +1044,22 @@
                         dhcpRow.style.display = 'none';
                     }
 
+                    // Gateway/Subnet
+                    const gatewayRow = document.getElementById('gatewayRow');
+                    if (data.network.gateway) {
+                        document.getElementById('gateway').textContent = data.network.gateway;
+                        gatewayRow.style.display = 'flex';
+                    } else if (gatewayRow) {
+                        gatewayRow.style.display = 'none';
+                    }
+                    const subnetRow = document.getElementById('subnetRow');
+                    if (data.network.subnet) {
+                        document.getElementById('subnet').textContent = data.network.subnet;
+                        subnetRow.style.display = 'flex';
+                    } else if (subnetRow) {
+                        subnetRow.style.display = 'none';
+                    }
+
                     // Container IP (from inside container)
                     const containerIpRow = document.getElementById('containerIpRow');
                     if (data.network.container_ip) {
@@ -1076,6 +1104,15 @@
                         portsRow.style.display = 'flex';
                     } else if (portsRow) {
                         portsRow.style.display = 'none';
+                    }
+
+                    // Suggested env (override hint)
+                    const suggestedEnvRow = document.getElementById('suggestedEnvRow');
+                    if (data.network.suggested_env) {
+                        document.getElementById('suggestedEnv').textContent = data.network.suggested_env;
+                        suggestedEnvRow.style.display = 'flex';
+                    } else if (suggestedEnvRow) {
+                        suggestedEnvRow.style.display = 'none';
                     }
 
                     // Backup default path (from /api/stats)

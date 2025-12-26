@@ -14,6 +14,7 @@ import ssl
 import base64
 import socket
 import re
+import ipaddress
 from datetime import timedelta
 
 # PAM authentication
@@ -189,7 +190,7 @@ def host_ip_from_proc():
             candidate = filtered[0]
     except Exception:
         candidate = None
-    return candidate, None
+    return candidate, None, None, None
 
 
 def host_ip_from_nsenter():
@@ -198,7 +199,7 @@ def host_ip_from_nsenter():
         cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'scope', 'global']
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
         if result.returncode != 0:
-            return None, None
+            return None, None, None, None
         lines = result.stdout.split('\n')
         ips = []
         for line in lines:
@@ -215,35 +216,45 @@ def host_ip_from_nsenter():
                     if ip_only.startswith('169.254.'):
                         continue
                     source = 'dhcp' if 'dynamic' in parts else 'static'
-                    ips.append((ip_only, source))
+                    try:
+                        net = ipaddress.IPv4Interface(cidr)
+                        subnet = str(net.netmask)
+                    except Exception:
+                        subnet = None
+                    ips.append((ip_only, source, None, subnet))
         if ips:
             return ips[0]
     except Exception:
-        return None, None
-    return None, None
+        return None, None, None, None
+    return None, None, None, None
 
 
 def host_ip_via_route():
-    """Prefer default route interface to pick IP (host namespace)"""
+    """Prefer default route interface to pick IP/gateway/subnet (host namespace)"""
     try:
         route_cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', 'route', 'show', 'default']
         route_res = subprocess.run(route_cmd, capture_output=True, text=True, timeout=2)
         if route_res.returncode != 0:
-            return None, None
+            return None, None, None, None, None
         line = route_res.stdout.strip().split('\n')[0] if route_res.stdout else ''
         if not line:
-            return None, None
+            return None, None, None, None, None
         parts = line.split()
+        gw = None
+        if 'via' in parts:
+            via_idx = parts.index('via') + 1
+            if via_idx < len(parts):
+                gw = parts[via_idx]
         if 'dev' not in parts:
-            return None, None
+            return None, None, None, None, None
         dev_idx = parts.index('dev') + 1
         if dev_idx >= len(parts):
-            return None, None
+            return None, None, None, None, None
         iface = parts[dev_idx]
         addr_cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'dev', iface, 'scope', 'global']
         addr_res = subprocess.run(addr_cmd, capture_output=True, text=True, timeout=2)
         if addr_res.returncode != 0:
-            return None, None
+            return None, None, None, None, None
         lines = addr_res.stdout.split('\n')
         for l in lines:
             l = l.strip()
@@ -254,10 +265,15 @@ def host_ip_via_route():
                 if ip_only.startswith(('127.', '169.254.', '172.17.', '172.18.', '172.19.')):
                     continue
                 source = 'dhcp' if 'dynamic' in parts else 'static'
-                return ip_only, source
+                try:
+                    net = ipaddress.IPv4Interface(cidr)
+                    subnet = str(net.netmask)
+                except Exception:
+                    subnet = None
+                return ip_only, source, gw, subnet, iface
     except Exception:
-        return None, None
-    return None, None
+        return None, None, None, None, None
+    return None, None, None, None, None
 
 
 class StatsHandler(BaseHTTPRequestHandler):
@@ -748,11 +764,13 @@ class StatsHandler(BaseHTTPRequestHandler):
         """Get network stats"""
         detected_container_ip = auto_detect_ip()
 
-        route_ip, route_source = host_ip_via_route()
-        proc_ip, proc_source = host_ip_from_proc()
-        nsenter_ip, nsenter_source = host_ip_from_nsenter()
+        route_ip, route_source, route_gw, route_subnet, route_iface = host_ip_via_route()
+        proc_ip, proc_source, proc_gw, proc_subnet = host_ip_from_proc()
+        nsenter_ip, nsenter_source, nsenter_gw, nsenter_subnet = host_ip_from_nsenter()
 
         host_ip = IP_OVERRIDE or route_ip or proc_ip or nsenter_ip or detected_container_ip or 'Unknown'
+        gw = route_gw or proc_gw or nsenter_gw
+        subnet = route_subnet or proc_subnet or nsenter_subnet
 
         # Determine assignment source
         if IP_OVERRIDE:
@@ -790,6 +808,10 @@ class StatsHandler(BaseHTTPRequestHandler):
         if STATIC_SUBNET:
             config_block['subnet'] = STATIC_SUBNET
 
+        suggested_env = None
+        if host_ip and host_ip != 'Unknown' and not IP_OVERRIDE:
+            suggested_env = f"DASHBOARD_IP_OVERRIDE={host_ip}"
+
         return {
             'ip': host_ip,
             'container_ip': detected_container_ip or 'Unknown',
@@ -798,6 +820,9 @@ class StatsHandler(BaseHTTPRequestHandler):
             'config': config_block,
             'assignment': assignment,
             'dhcp': assignment == 'dhcp',
+            'gateway': gw,
+            'subnet': subnet,
+            'suggested_env': suggested_env,
             'ports': {
                 'dashboard_https': 8443,
                 'backup_api_internal': 8081
