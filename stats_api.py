@@ -276,6 +276,49 @@ def host_ip_via_route():
     return None, None, None, None, None
 
 
+def host_ip_from_proc_route():
+    """Fallback: parse /host/proc/net/route for default gateway and derive subnet via nsenter ip addr"""
+    try:
+        with open('/host/proc/net/route', 'r') as f:
+            lines = f.readlines()
+        for line in lines[1:]:
+            parts = line.strip().split('\t')
+            if len(parts) < 3:
+                continue
+            iface, dest_hex, gateway_hex = parts[0], parts[1], parts[2]
+            if dest_hex != '00000000':
+                continue  # not default
+            try:
+                gw = socket.inet_ntoa(bytes.fromhex(gateway_hex))[::-1]
+            except Exception:
+                # Alternative byte order
+                gw = socket.inet_ntoa(bytes.fromhex(gateway_hex)) if len(gateway_hex) == 8 else None
+            # get ip/mask for iface
+            try:
+                addr_cmd = ['nsenter', '--net=/host/proc/1/ns/net', 'ip', '-4', 'addr', 'show', 'dev', iface, 'scope', 'global']
+                addr_res = subprocess.run(addr_cmd, capture_output=True, text=True, timeout=2)
+                if addr_res.returncode == 0:
+                    for l in addr_res.stdout.split('\n'):
+                        l = l.strip()
+                        if l.startswith('inet '):
+                            cidr = l.split()[1]
+                            ip_only = cidr.split('/')[0]
+                            if ip_only.startswith(('127.', '169.254.', '172.17.', '172.18.', '172.19.')):
+                                continue
+                            source = 'unknown'
+                            try:
+                                net = ipaddress.IPv4Interface(cidr)
+                                subnet = str(net.netmask)
+                            except Exception:
+                                subnet = None
+                            return ip_only, source, gw, subnet, iface
+            except Exception:
+                pass
+    except Exception:
+        return None, None, None, None, None
+    return None, None, None, None, None
+
+
 class StatsHandler(BaseHTTPRequestHandler):
     def check_auth(self):
         """Check HTTP Basic Authentication using PAM"""
@@ -765,6 +808,8 @@ class StatsHandler(BaseHTTPRequestHandler):
         detected_container_ip = auto_detect_ip()
 
         route_ip, route_source, route_gw, route_subnet, route_iface = host_ip_via_route()
+        if not route_ip:
+            route_ip, route_source, route_gw, route_subnet, route_iface = host_ip_from_proc_route()
         proc_ip, proc_source, proc_gw, proc_subnet = host_ip_from_proc()
         nsenter_ip, nsenter_source, nsenter_gw, nsenter_subnet = host_ip_from_nsenter()
 
