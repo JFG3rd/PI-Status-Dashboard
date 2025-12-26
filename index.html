@@ -752,8 +752,12 @@
             <div class="card">
                 <h2>🌐 Network</h2>
                 <div class="stat">
-                    <span class="stat-label">IP Address:</span>
+                    <span class="stat-label">Host IP:</span>
                     <span class="stat-value" id="ipAddress">--</span>
+                </div>
+                <div class="stat" id="containerIpRow" style="display: none;">
+                    <span class="stat-label">Container IP:</span>
+                    <span class="stat-value" id="containerIp">--</span>
                 </div>
                 <div class="stat" id="staticIpRow" style="display: none;">
                     <span class="stat-label">Configured IP:</span>
@@ -774,6 +778,10 @@
                 <div class="stat">
                     <span class="stat-label">TX (Transmitted):</span>
                     <span class="stat-value" id="netTx">-- MB</span>
+                </div>
+                <div class="stat" id="portsRow" style="display: none;">
+                    <span class="stat-label">Ports:</span>
+                    <span class="stat-value" id="portsInfo">--</span>
                 </div>
             </div>
             
@@ -998,6 +1006,15 @@
                     document.getElementById('netRx').textContent = data.network.rx;
                     document.getElementById('netTx').textContent = data.network.tx;
 
+                    // Container IP (from inside container)
+                    const containerIpRow = document.getElementById('containerIpRow');
+                    if (data.network.container_ip) {
+                        document.getElementById('containerIp').textContent = data.network.container_ip;
+                        containerIpRow.style.display = 'flex';
+                    } else if (containerIpRow) {
+                        containerIpRow.style.display = 'none';
+                    }
+
                     // Static network config (optional)
                     const config = data.network.config || {};
                     const staticIpRow = document.getElementById('staticIpRow');
@@ -1020,6 +1037,19 @@
                         staticSubnetRow.style.display = 'flex';
                     } else if (staticSubnetRow) {
                         staticSubnetRow.style.display = 'none';
+                    }
+
+                    // Ports overview
+                    const portsRow = document.getElementById('portsRow');
+                    if (data.network.ports) {
+                        const ports = data.network.ports;
+                        const parts = [];
+                        if (ports.dashboard_https) parts.push(`Dashboard HTTPS: ${ports.dashboard_https}`);
+                        if (ports.backup_api_internal) parts.push(`Backup API: ${ports.backup_api_internal} (internal)`);
+                        document.getElementById('portsInfo').textContent = parts.join(' | ');
+                        portsRow.style.display = 'flex';
+                    } else if (portsRow) {
+                        portsRow.style.display = 'none';
                     }
 
                     // Backup default path (from /api/stats)

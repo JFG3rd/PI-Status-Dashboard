@@ -13,6 +13,7 @@ import time
 import ssl
 import base64
 import socket
+import re
 from datetime import timedelta
 
 # PAM authentication
@@ -166,6 +167,29 @@ def auto_detect_ip():
     except Exception:
         pass
     return None
+
+
+def host_ip_from_proc():
+    """Parse host IPs from mounted /host/proc/net/fib_trie and pick a likely LAN IP"""
+    candidate = None
+    try:
+        with open('/host/proc/net/fib_trie', 'r') as f:
+            data = f.read()
+        # Find all IPv4 addresses
+        ips = re.findall(r'\b(?:\d{1,3}\.){3}\d{1,3}\b', data)
+        filtered = []
+        for ip in ips:
+            if ip.startswith('127.'):
+                continue
+            # Skip common docker bridge ranges
+            if ip.startswith('172.17.') or ip.startswith('172.18.') or ip.startswith('172.19.'):
+                continue
+            filtered.append(ip)
+        if filtered:
+            candidate = filtered[0]
+    except Exception:
+        candidate = None
+    return candidate
 
 
 class StatsHandler(BaseHTTPRequestHandler):
@@ -654,7 +678,8 @@ class StatsHandler(BaseHTTPRequestHandler):
     
     def get_network_stats(self):
         """Get network stats"""
-        detected_ip = IP_OVERRIDE or auto_detect_ip() or 'Unknown'
+        detected_container_ip = auto_detect_ip()
+        host_ip = IP_OVERRIDE or host_ip_from_proc() or detected_container_ip or 'Unknown'
         
         rx_bytes = 0
         tx_bytes = 0
@@ -681,10 +706,15 @@ class StatsHandler(BaseHTTPRequestHandler):
             config_block['subnet'] = STATIC_SUBNET
 
         return {
-            'ip': detected_ip,
+            'ip': host_ip,
+            'container_ip': detected_container_ip or 'Unknown',
             'rx': f"{rx_bytes / (1024**3):.2f} GB",
             'tx': f"{tx_bytes / (1024**3):.2f} GB",
-            'config': config_block
+            'config': config_block,
+            'ports': {
+                'dashboard_https': 8443,
+                'backup_api_internal': 8081
+            }
         }
 
     def get_docker_stats(self):
