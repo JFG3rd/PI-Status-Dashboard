@@ -40,7 +40,9 @@ IP_OVERRIDE = os.getenv('DASHBOARD_IP_OVERRIDE')
 STATIC_IP = os.getenv('DASHBOARD_STATIC_IP')
 STATIC_GATEWAY = os.getenv('DASHBOARD_STATIC_GATEWAY')
 STATIC_SUBNET = os.getenv('DASHBOARD_STATIC_SUBNET')
-BACKUP_DEFAULT_PATH = os.getenv('BACKUP_DEFAULT_PATH', '/mnt/backup-ssd/backups')
+NVME_BACKUP_PATH = os.getenv('NVME_BACKUP_PATH', os.getenv('BACKUP_DEFAULT_PATH', '/nvme-backups'))
+USB_BACKUP_PATH = os.getenv('USB_BACKUP_PATH', '/mnt/backup-ssd/backups')
+BACKUP_DEFAULT_PATH = NVME_BACKUP_PATH
 
 # Import Scrypted stats module
 try:
@@ -702,7 +704,9 @@ class StatsHandler(BaseHTTPRequestHandler):
             'network': self.get_network_stats(),
             'system': self.get_system_info(),
             'backup_config': {
-                'default_path': BACKUP_DEFAULT_PATH
+                'default_path': BACKUP_DEFAULT_PATH,
+                'nvme_path': NVME_BACKUP_PATH,
+                'usb_path': USB_BACKUP_PATH
             }
         }
         
