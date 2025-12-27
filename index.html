@@ -16,10 +16,10 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 14px;
+            font-size: 13px;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             color: #fff;
-            padding: 18px;
+            padding: 16px;
             min-height: 100vh;
         }
         
@@ -29,13 +29,14 @@
         }
         
         .header {
+            position: relative;
             text-align: center;
-            margin-bottom: 30px;
+            margin-bottom: 26px;
         }
         
         .header h1 {
-            font-size: 2.2em;
-            margin-bottom: 8px;
+            font-size: 2.0em;
+            margin-bottom: 6px;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
@@ -47,39 +48,42 @@
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
-            margin-bottom: 16px;
+            gap: 14px;
+            margin-bottom: 14px;
         }
         
         .card {
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(10px);
-            border-radius: 14px;
-            padding: 18px;
-            box-shadow: 0 6px 26px rgba(0, 0, 0, 0.28);
+            border-radius: 13px;
+            padding: 16px;
+            box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
             border: 1px solid rgba(255, 255, 255, 0.18);
         }
         
         .card h2 {
-            font-size: 1.15em;
-            margin-bottom: 12px;
+            font-size: 1.05em;
+            margin-bottom: 10px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.25);
-            padding-bottom: 8px;
+            padding-bottom: 7px;
         }
         
         .stat {
             display: flex;
             justify-content: space-between;
-            margin: 10px 0;
-            padding: 6px 0;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 4px 8px;
+            margin: 8px 0;
+            padding: 5px 0;
         }
 
         .network-card .stat {
             flex-direction: column;
             align-items: flex-start;
             gap: 2px;
-            margin: 8px 0;
-            padding: 6px 0;
+            margin: 6px 0;
+            padding: 5px 0;
         }
 
         .network-card .stat-label {
@@ -88,17 +92,20 @@
         }
 
         .network-card .stat-value {
-            font-size: 1em;
+            font-size: 0.98em;
         }
         
         .stat-label {
             opacity: 0.9;
-            font-size: 0.95em;
+            font-size: 0.9em;
         }
         
         .stat-value {
             font-weight: bold;
-            font-size: 1.05em;
+            font-size: 1.0em;
+            max-width: 100%;
+            word-break: break-word;
+            white-space: normal;
         }
         
         .progress-bar {
@@ -169,7 +176,7 @@
         }
 
         .container-id {
-            font-size: 0.85em;
+            font-size: 0.8em;
             opacity: 0.75;
         }
         
@@ -618,6 +625,15 @@
             background: #f44336;
             color: white;
         }
+
+        .build-info {
+            position: absolute;
+            right: 0;
+            top: 0;
+            font-size: 0.95em;
+            opacity: 0.9;
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -625,6 +641,7 @@
         <div class="header">
             <h1><svg style="width: 1.2em; height: 1.2em; vertical-align: middle; margin-right: 10px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><linearGradient id="gradHeader" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#2196F3"/><stop offset="100%" style="stop-color:#1976D2"/></linearGradient></defs><circle cx="50" cy="50" r="48" fill="url(#gradHeader)"/><text x="50" y="73" font-family="Georgia,serif" font-size="70" font-weight="bold" fill="white" text-anchor="middle">π</text><circle cx="20" cy="20" r="4" fill="#00FF00" opacity="0.8"/><circle cx="80" cy="20" r="4" fill="#00FF00" opacity="0.8"/><circle cx="20" cy="80" r="4" fill="#00FF00" opacity="0.8"/><circle cx="80" cy="80" r="4" fill="#00FF00" opacity="0.8"/><line x1="20" y1="20" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="80" y1="20" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="20" y1="80" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><line x1="80" y1="80" x2="50" y2="50" stroke="#00FF00" stroke-width="1.5" opacity="0.5"/><circle cx="50" cy="10" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="90" cy="50" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="50" cy="90" r="3" fill="#FF6B6B" opacity="0.8"/><circle cx="10" cy="50" r="3" fill="#FF6B6B" opacity="0.8"/><line x1="50" y1="10" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="90" y1="50" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="50" y1="90" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/><line x1="10" y1="50" x2="50" y2="50" stroke="#FF6B6B" stroke-width="1.5" opacity="0.3"/></svg>Raspberry Pi 5 NVR Status</h1>
             <div class="timestamp">Last updated: <span id="lastUpdate">Loading...</span></div>
+            <div class="build-info" id="buildInfo">v1.03 • Jesse Greene</div>
         </div>
         
         <div class="grid">
