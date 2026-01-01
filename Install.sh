@@ -73,7 +73,8 @@ echo "📁 Creating directories..."
 sudo mkdir -p /home/$USER/status-dashboard
 sudo mkdir -p /etc/ssl/dashboard
 sudo mkdir -p /nvme-backups 2>/dev/null || true
-sudo mkdir -p /mnt/backup-ssd 2>/dev/null || true
+sudo mkdir -p /mnt/backup-ssd/backups 2>/dev/null || true
+sudo mkdir -p /scrypted/nvr 2>/dev/null || true
 
 # Install dependencies
 echo "📦 Installing dependencies..."
@@ -84,20 +85,27 @@ sudo apt-get install -y python3 python3-pip git curl
 echo "🐍 Installing Python packages..."
 pip3 install --break-system-packages psutil python-pam || pip3 install psutil python-pam
 
-# Clone or copy files
+# Copy dashboard files from repo root (this installer lives in repo root)
 echo "📥 Installing dashboard files..."
 INSTALL_DIR="/home/$USER/status-dashboard"
-cd "$(dirname "$0")"
+REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Copy dashboard files
-cp -r dashboard/* "$INSTALL_DIR/"
-cp docker/Dockerfile "$INSTALL_DIR/"
-cp docker/docker-compose.yml "$INSTALL_DIR/"
+cp "$REPO_DIR"/index.html "$INSTALL_DIR/"
+cp "$REPO_DIR"/stats_api.py "$INSTALL_DIR/"
+cp "$REPO_DIR"/scrypted_stats.py "$INSTALL_DIR/"
+cp "$REPO_DIR"/scrypted_update.js "$INSTALL_DIR/" 2>/dev/null || true
+cp "$REPO_DIR"/scrypted_card.html "$INSTALL_DIR/" 2>/dev/null || true
+cp "$REPO_DIR"/Dockerfile "$INSTALL_DIR/"
+cp "$REPO_DIR"/docker-compose.yml "$INSTALL_DIR/"
 
-# Copy scripts
-sudo cp scripts/backup-api-server.py /home/$USER/
-sudo cp scripts/backup-restore-service.sh /home/$USER/
-sudo chmod +x /home/$USER/backup-restore-service.sh
+# Copy scripts (expect them beside this installer in repo root under scripts/)
+if [ -f "$REPO_DIR/scripts/backup-api-server.py" ]; then
+    sudo cp "$REPO_DIR/scripts/backup-api-server.py" /home/$USER/
+fi
+if [ -f "$REPO_DIR/scripts/backup-restore-service.sh" ]; then
+    sudo cp "$REPO_DIR/scripts/backup-restore-service.sh" /home/$USER/
+    sudo chmod +x /home/$USER/backup-restore-service.sh
+fi
 
 # Setup SSL certificates
 echo "🔐 Setting up SSL certificates..."
@@ -110,20 +118,29 @@ if [ ! -f /etc/ssl/dashboard/server.crt ]; then
     sudo chmod 600 /etc/ssl/dashboard/server.key
 fi
 
-# Setup backup API service
-echo "⚙️  Setting up backup API service..."
-sudo cp config/backup-api.service /etc/systemd/system/
-sudo sed -i "s/USER_PLACEHOLDER/$USER/g" /etc/systemd/system/backup-api.service
-sudo systemctl daemon-reload
-sudo systemctl enable backup-api.service
-sudo systemctl start backup-api.service
+# Setup backup API service (only if unit file exists alongside installer)
+if [ -f "$REPO_DIR/config/backup-api.service" ]; then
+    echo "⚙️  Setting up backup API service..."
+    sudo cp "$REPO_DIR/config/backup-api.service" /etc/systemd/system/
+    sudo sed -i "s/USER_PLACEHOLDER/$USER/g" /etc/systemd/system/backup-api.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable backup-api.service
+    sudo systemctl start backup-api.service
+else
+    echo "⚠️  Skipping backup API service setup (config/backup-api.service not found)"
+fi
+
+# Create .env from example if missing
+cd "$INSTALL_DIR"
+if [ ! -f .env ] && [ -f .env.example ]; then
+    cp .env.example .env
+fi
 
 # Build and start dashboard
 echo "🐳 Building dashboard container..."
-cd "$INSTALL_DIR"
-docker-compose down 2>/dev/null || true
-docker-compose build
-docker-compose up -d
+docker compose down 2>/dev/null || true
+docker compose build
+docker compose up -d
 
 # Get IP address
 IP_ADDR=$(hostname -I | awk '{print $1}')
