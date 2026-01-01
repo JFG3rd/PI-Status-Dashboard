@@ -1,4 +1,4 @@
-docker-compose up -d
+
 # Pi Status Dashboard (Pi 4/5)
 
 Raspberry Pi dashboard for local NVR/edge setups. It autodetects available hardware (NVMe, SD, USB SSD, Hailo AI, Docker, Scrypted), shows live status, and controls backup/restore with abort support. HTTPS + PAM auth.
