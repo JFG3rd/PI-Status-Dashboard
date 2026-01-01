@@ -75,6 +75,8 @@ sudo mkdir -p /etc/ssl/dashboard
 sudo mkdir -p /nvme-backups 2>/dev/null || true
 sudo mkdir -p /mnt/backup-ssd/backups 2>/dev/null || true
 sudo mkdir -p /scrypted/nvr 2>/dev/null || true
+# Ensure user owns working directories so copies succeed
+sudo chown -R $USER:$USER /home/$USER/status-dashboard /nvme-backups /mnt/backup-ssd /scrypted 2>/dev/null || true
 
 # Install dependencies
 echo "📦 Installing dependencies..."
