@@ -294,12 +294,16 @@
             height: 300px;
             overflow-y: auto;
             margin-top: 20px;
-            font-size: 0.9em;
+            font-size: 0.85em;
             line-height: 1.6;
             border: 1px solid rgba(0, 255, 0, 0.3);
             box-shadow: inset 0 0 15px rgba(0, 255, 0, 0.05);
             text-shadow: 0 0 2px rgba(0, 255, 0, 0.5);
             white-space: pre-wrap;
+        }
+
+        .log-error {
+            color: #ff6b6b;
         }
         
         .log-output::-webkit-scrollbar {
@@ -1415,6 +1419,8 @@
             
             btn.disabled = true;
             btn.textContent = '⏳ Backing up...';
+            const abortBtn = document.getElementById('abortBackupBtn');
+            if (abortBtn) abortBtn.disabled = false;
             logDiv.textContent = '[' + new Date().toLocaleTimeString() + '] Starting backup...\n';
             
             // Start backup
@@ -1433,31 +1439,73 @@
                     logDiv.textContent += '\n❌ ERROR: ' + data.message;
                     btn.disabled = false;
                     btn.textContent = '💾 Start Backup';
+                    if (abortBtn) abortBtn.disabled = true;
                 }
             })
             .catch(error => {
                 logDiv.textContent += '\n❌ ERROR: ' + error;
                 btn.disabled = false;
                 btn.textContent = '💾 Start Backup';
+                if (abortBtn) abortBtn.disabled = true;
+            });
+        }
+
+        function abortBackup() {
+            const abortBtn = document.getElementById('abortBackupBtn');
+            if (abortBtn) abortBtn.disabled = true;
+            fetch('/api/backup/abort', {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const logDiv = document.getElementById('backupLog');
+                logDiv.textContent += `\n[${new Date().toLocaleTimeString()}] Abort requested: ${data.message || data.status}`;
+                const btn = document.getElementById('startBackupBtn');
+                btn.disabled = false;
+                btn.textContent = '💾 Start Backup';
+                if (pollInterval) clearInterval(pollInterval);
+                setTimeout(loadBackupStats, 1000);
+            })
+            .catch(error => {
+                const logDiv = document.getElementById('backupLog');
+                logDiv.textContent += `\n❌ ERROR: Abort failed: ${error}`;
             });
         }
         
         let pollInterval = null;
+        function renderLog(logText) {
+            const escapeHtml = (text) => text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+            const errorPattern = /(error|failed|fatal)/i;
+            return logText.split('\n').map(line => {
+                const escaped = escapeHtml(line);
+                if (errorPattern.test(line)) {
+                    return `<span class="log-error">${escaped}</span>`;
+                }
+                return escaped;
+            }).join('\n');
+        }
+
         function pollBackupLog() {
             pollInterval = setInterval(() => {
                 fetch('/api/backup/log', {credentials: 'include'})
                     .then(response => response.text())
                     .then(logText => {
                         const logDiv = document.getElementById('backupLog');
-                        logDiv.textContent = logText;
+                        logDiv.innerHTML = renderLog(logText);
                         logDiv.scrollTop = logDiv.scrollHeight;
                         
                         // Check if backup is complete
-                        if (logText.includes('BACKUP COMPLETE') || logText.includes('SUCCESS') || logText.includes('FAILED')) {
+                        if (logText.includes('BACKUP COMPLETE') || logText.includes('SUCCESS') || logText.includes('FAILED') || logText.includes('ABORTED')) {
                             clearInterval(pollInterval);
                             const btn = document.getElementById('startBackupBtn');
                             btn.disabled = false;
                             btn.textContent = '💾 Start Backup';
+                            const abortBtn = document.getElementById('abortBackupBtn');
+                            if (abortBtn) abortBtn.disabled = true;
                             
                             // Reload backup stats after completion
                             setTimeout(loadBackupStats, 2000);
@@ -1541,8 +1589,16 @@
             fetch('/api/backup/list', {credentials: 'include'})
                 .then(response => response.json())
                 .then(data => {
-                    // API returns {"backups": [...]} so we need to extract the array
-                    allBackups = data.backups || data || [];
+                    // Normalize various possible shapes: {backups: [...]}, [...], or object map
+                    let backups = [];
+                    if (Array.isArray(data?.backups)) {
+                        backups = data.backups;
+                    } else if (Array.isArray(data)) {
+                        backups = data;
+                    } else if (data && typeof data.backups === 'object') {
+                        backups = Object.values(data.backups);
+                    }
+                    allBackups = Array.isArray(backups) ? backups : [];
                     console.log('Loaded backups:', allBackups);
                     renderBackupList();
                 })
@@ -1555,6 +1611,11 @@
         function renderBackupList() {
             const listDiv = document.getElementById('backupList');
             
+            if (!Array.isArray(allBackups)) {
+                listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #f44;">❌ Error loading backups: invalid response format</div>';
+                return;
+            }
+
             if (!allBackups || allBackups.length === 0) {
                 listDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #999;">No backups found. Create a backup first!</div>';
                 return;
@@ -1825,6 +1886,7 @@
             
             const logDiv = document.getElementById('restoreLog');
             const btn = document.getElementById('startRestoreBtn');
+            const abortBtn = document.getElementById('abortRestoreBtn');
             
             const components = {};
             ['scrypted_config', 'scrypted_metadata', 'docker_containers', 'docker_volumes', 'dashboard', 'system_config', 'ssl_certs', 'scripts', 'full_recordings'].forEach(comp => {
@@ -1834,6 +1896,7 @@
             
             btn.disabled = true;
             btn.textContent = '⏳ Restoring...';
+            if (abortBtn) abortBtn.disabled = false;
             logDiv.textContent = '[' + new Date().toLocaleTimeString() + '] Starting restore from: ' + selectedBackup + '\n';
             
             fetch('/api/restore', {
@@ -1850,12 +1913,37 @@
                     logDiv.textContent += '\n❌ ERROR: ' + data.message;
                     btn.disabled = false;
                     btn.textContent = '♻️ Start Restore';
+                    if (abortBtn) abortBtn.disabled = true;
                 }
             })
             .catch(error => {
                 logDiv.textContent += '\n❌ ERROR: ' + error;
                 btn.disabled = false;
                 btn.textContent = '♻️ Start Restore';
+                if (abortBtn) abortBtn.disabled = true;
+            });
+        }
+
+        function abortRestore() {
+            const abortBtn = document.getElementById('abortRestoreBtn');
+            if (abortBtn) abortBtn.disabled = true;
+            fetch('/api/restore/abort', {
+                method: 'POST',
+                credentials: 'include'
+            })
+            .then(response => response.json())
+            .then(data => {
+                const logDiv = document.getElementById('restoreLog');
+                logDiv.textContent += `\n[${new Date().toLocaleTimeString()}] Abort requested: ${data.message || data.status}`;
+                const btn = document.getElementById('startRestoreBtn');
+                btn.disabled = false;
+                btn.textContent = '♻️ Start Restore';
+                if (restorePollInterval) clearInterval(restorePollInterval);
+                setTimeout(loadBackupStats, 1000);
+            })
+            .catch(error => {
+                const logDiv = document.getElementById('restoreLog');
+                logDiv.textContent += `\n❌ ERROR: Abort failed: ${error}`;
             });
         }
         
@@ -1866,17 +1954,19 @@
                     .then(response => response.text())
                     .then(logText => {
                         const logDiv = document.getElementById('restoreLog');
-                        logDiv.textContent = logText;
+                        logDiv.innerHTML = renderLog(logText);
                         logDiv.scrollTop = logDiv.scrollHeight;
                         
                         // Check if restore is complete
-                        if (logText.includes('RESTORE COMPLETE') || logText.includes('SUCCESS') || logText.includes('FAILED')) {
+                        if (logText.includes('RESTORE COMPLETE') || logText.includes('SUCCESS') || logText.includes('FAILED') || logText.includes('ABORTED')) {
                             clearInterval(restorePollInterval);
                             const btn = document.getElementById('startRestoreBtn');
                             btn.disabled = false;
                             btn.textContent = '♻️ Start Restore';
+                            const abortBtn = document.getElementById('abortRestoreBtn');
+                            if (abortBtn) abortBtn.disabled = true;
                             if (logText.includes('SUCCESS')) {
-                                logDiv.textContent += '\n\n✅ RESTORE COMPLETE!';
+                                logDiv.innerHTML += '\n\n✅ RESTORE COMPLETE!';
                             }
                         }
                     })
@@ -1989,6 +2079,9 @@
                 <button class="action-button primary" id="startBackupBtn" onclick="executeBackup()">
                     💾 Start Backup
                 </button>
+                <button class="action-button secondary" id="abortBackupBtn" onclick="abortBackup()" disabled>
+                    ⏹ Abort Backup
+                </button>
                 <button class="action-button secondary" onclick="showRestoreView()">
                     🔄 Switch to Restore
                 </button>
@@ -2093,6 +2186,9 @@
                 <div style="text-align: center; margin-bottom: 20px;">
                     <button class="action-button primary" id="startRestoreBtn" onclick="executeRestore()" disabled>
                         ♻️ Start Restore
+                    </button>
+                    <button class="action-button secondary" id="abortRestoreBtn" onclick="abortRestore()" disabled>
+                        ⏹ Abort Restore
                     </button>
                     <button class="action-button secondary" onclick="showBackupView()">
                         ⬅️ Back to Backup
