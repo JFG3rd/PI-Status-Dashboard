@@ -720,6 +720,9 @@
                 <div class="progress-bar">
                     <div class="progress-fill progress-ok" id="diskProgress" style="width: 0%">0%</div>
                 </div>
+
+                <div style="margin-top: 12px; font-weight: 600; color: #a7c4ff;">Detected Storage</div>
+                <div id="storageDevicesList" style="margin-top: 8px; display: flex; flex-direction: column; gap: 8px;"></div>
                 
                 <div id="sdCardSection" style="margin-top: 15px; display: none;">
                     <h3 style="font-size: 0.9em; margin: 10px 0 5px 0; color: #64b5f6;">SD Card</h3>
@@ -1275,6 +1278,11 @@
                     
                     // Load backup statistics
                     loadBackupStats();
+
+                    // Render storage devices list
+                    if (data.storage_devices) {
+                        renderStorageDevices(Array.isArray(data.storage_devices.devices) ? data.storage_devices.devices : data.storage_devices);
+                    }
                 })
                 .catch(error => {
                     console.error('Error fetching stats:', error);
@@ -1296,6 +1304,72 @@
             } else {
                 element.classList.add('progress-danger');
             }
+        }
+
+        function renderStorageDevices(devices) {
+            const list = document.getElementById('storageDevicesList');
+            if (!list) return;
+
+            if (!Array.isArray(devices)) {
+                list.innerHTML = '<div style="color:#f88;">Failed to load storage devices</div>';
+                return;
+            }
+
+            if (devices.length === 0) {
+                list.innerHTML = '<div style="color:#aaa;">No storage devices detected.</div>';
+                return;
+            }
+
+            const rows = devices.map(dev => {
+                const mounted = dev.mounted;
+                const mountInfo = mounted
+                    ? `Mounted at ${dev.mountpoint || 'unknown'}`
+                    : 'Not mounted';
+                const usage = dev.usage
+                    ? `${dev.usage.used} / ${dev.usage.total} (${Math.round(dev.usage.percent)}%)`
+                    : '--';
+                const btn = (!mounted && dev.suggested_mount)
+                    ? `<button class="btn btn-secondary" style="padding:4px 8px;" onclick="mountStorage('${dev.suggested_mount}')">Mount</button>`
+                    : '';
+                return `
+                    <div style="padding:8px; border:1px solid #23395d; border-radius:8px; background:#0f1e36; display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between; gap:8px;">
+                            <div style="font-weight:600; color:#dce8ff;">${dev.model || dev.name || 'Device'}</div>
+                            <div style="color:#9bb6db;">${dev.size || ''}</div>
+                        </div>
+                        <div style="color:#9bb6db; font-size:0.9em;">${dev.path || ''} • ${dev.transport || ''} • ${dev.fstype || ''}</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                            <div style="color:${mounted ? '#7cf29c' : '#f7c46c'};">${mountInfo}</div>
+                            ${btn}
+                        </div>
+                        <div style="color:#9bb6db; font-size:0.9em;">Usage: ${usage}</div>
+                    </div>
+                `;
+            });
+            list.innerHTML = rows.join('');
+        }
+
+        function mountStorage(mountpoint) {
+            const list = document.getElementById('storageDevicesList');
+            if (list) {
+                list.innerHTML = '<div style="color:#aaa;">Mounting... please wait</div>';
+            }
+            fetch('/api/storage/mount', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify({mountpoint})
+            }).then(r => r.json())
+              .then(res => {
+                  if (!res.success) {
+                      alert('Mount failed: ' + (res.message || 'Unknown error'));
+                  }
+                  loadStats();
+              })
+              .catch(err => {
+                  alert('Mount error: ' + err);
+                  loadStats();
+              });
         }
         
         function loadBackupStats() {

@@ -96,19 +96,32 @@ def detect_hardware():
     except:
         pass
     
-    # Detect boot device
+    # Detect boot device using mounted root source
     try:
-        with open('/proc/cmdline', 'r') as f:
-            cmdline = f.read()
-            if 'root=/dev/nvme' in cmdline or 'root=PARTUUID=' in cmdline:
-                # Check if PARTUUID points to NVMe
-                hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'unknown'
-            elif 'root=/dev/mmcblk0' in cmdline:
-                hardware['boot_device'] = 'sd'
-            else:
-                hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'sd'
-    except:
-        hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'sd'
+        root_source = subprocess.check_output(['findmnt', '-no', 'SOURCE', '/'], text=True).strip()
+    except Exception:
+        root_source = ''
+
+    if root_source:
+        if root_source.startswith('/dev/nvme') or root_source.startswith('/host/dev/nvme'):
+            hardware['boot_device'] = 'nvme'
+        elif root_source.startswith('/dev/mmcblk') or root_source.startswith('/host/dev/mmcblk'):
+            hardware['boot_device'] = 'sd'
+        else:
+            hardware['boot_device'] = 'unknown'
+    else:
+        # Fallback to cmdline heuristic
+        try:
+            with open('/proc/cmdline', 'r') as f:
+                cmdline = f.read()
+                if 'root=/dev/nvme' in cmdline or 'root=PARTUUID=' in cmdline:
+                    hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'unknown'
+                elif 'root=/dev/mmcblk0' in cmdline:
+                    hardware['boot_device'] = 'sd'
+                else:
+                    hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'sd'
+        except:
+            hardware['boot_device'] = 'nvme' if hardware['nvme'] else 'sd'
     
     # Detect Hailo
     try:
@@ -466,6 +479,14 @@ class StatsHandler(BaseHTTPRequestHandler):
         
         elif self.path == '/api/backup/stats':
             self.proxy_to_backup_api('/api/backup/stats')
+
+        elif self.path == '/api/storage/devices':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            devices = self.get_storage_devices()
+            self.wfile.write(json.dumps({'devices': devices}).encode())
             
         elif self.path == '/api/stats':
             self.send_response(200)
@@ -545,6 +566,25 @@ class StatsHandler(BaseHTTPRequestHandler):
             
         elif self.path == '/api/backup/delete':
             self.proxy_post_to_backup_api('/api/backup/delete', body)
+
+        elif self.path == '/api/storage/mount':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            try:
+                data = json.loads(body) if body else {}
+                mountpoint = data.get('mountpoint', '/mnt/backup-ssd')
+                if not mountpoint.startswith('/mnt/'):
+                    self.wfile.write(json.dumps({'success': False, 'message': 'Mountpoint not allowed'}).encode())
+                    return
+                result = subprocess.run(['mount', mountpoint], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    self.wfile.write(json.dumps({'success': True, 'mountpoint': mountpoint}).encode())
+                else:
+                    self.wfile.write(json.dumps({'success': False, 'message': result.stderr or 'mount failed', 'code': result.returncode}).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({'success': False, 'message': str(e)}).encode())
         
         elif self.path == '/api/restart':
             self.send_response(200)
@@ -701,6 +741,7 @@ class StatsHandler(BaseHTTPRequestHandler):
             'cpu': self.get_cpu_stats(),
             'memory': self.get_memory_stats(),
             'disk': self.get_disk_stats(hardware),
+            'storage_devices': self.get_storage_devices(),
             'network': self.get_network_stats(),
             'system': self.get_system_info(),
             'backup_config': {
@@ -1029,6 +1070,54 @@ class StatsHandler(BaseHTTPRequestHandler):
                 stats['status'] = '✅ Active'
             
             return stats
+
+        def get_storage_devices(self):
+            """Enumerate storage devices and their mount status"""
+            devices = []
+            try:
+                lsblk = subprocess.run(
+                    ['lsblk', '-J', '-b', '-o', 'NAME,PATH,SIZE,TYPE,TRAN,MOUNTPOINT,MODEL,FSTYPE'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if lsblk.returncode != 0:
+                    return {'error': lsblk.stderr.strip()}
+                data = json.loads(lsblk.stdout)
+                for blk in data.get('blockdevices', []):
+                    if blk.get('type') != 'disk':
+                        continue
+                    mountpoint = blk.get('mountpoint') or ''
+                    mounted = bool(mountpoint)
+                    # Suggested mountpoint for known roles
+                    suggested_mount = None
+                    if blk.get('tran') == 'usb':
+                        suggested_mount = '/mnt/backup-ssd'
+                    usage = None
+                    if mounted:
+                        try:
+                            u = psutil.disk_usage(mountpoint)
+                            usage = {
+                                'total': f"{u.total / (1024**3):.1f} GB",
+                                'used': f"{u.used / (1024**3):.1f} GB",
+                                'available': f"{u.free / (1024**3):.1f} GB",
+                                'percent': u.percent
+                            }
+                        except Exception:
+                            usage = None
+                    devices.append({
+                        'name': blk.get('name'),
+                        'path': blk.get('path'),
+                        'model': blk.get('model', '').strip(),
+                        'size': f"{int(blk.get('size', 0)) / (1024**3):.1f} GB" if blk.get('size') else '0 GB',
+                        'transport': blk.get('tran', ''),
+                        'fstype': blk.get('fstype', ''),
+                        'mounted': mounted,
+                        'mountpoint': mountpoint,
+                        'suggested_mount': suggested_mount,
+                        'usage': usage
+                    })
+            except Exception as e:
+                return {'error': str(e)}
+            return devices
             
         except Exception as e:
             stats['status'] = f'Error: {str(e)}'
