@@ -1,15 +1,13 @@
 FROM python:3.11-slim
 
-# Install system dependencies including Docker CLI and PAM
-RUN apt-get update && apt-get install -y \
+# Install system dependencies including Docker CLI and PAM (from Debian repo)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     procps \
     curl \
     iproute2 \
     libpam0g-dev \
     libcrypt1 \
-    && curl -fsSL https://get.docker.com -o get-docker.sh \
-    && sh get-docker.sh \
-    && rm get-docker.sh \
+    docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
