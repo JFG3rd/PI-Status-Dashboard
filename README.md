@@ -9,10 +9,11 @@ We welcome contributors! If you have ideas for enhancing this dashboard or addin
 
 ## Features
 - **Real-Time Monitoring:** Live CPU temperature and usage, memory stats, network utilization, IP details, and connected storage.
-- **Hardware Discovery:** Detects and visualizes attached devices such as NVMe drives, USB SSDs, and SD cards.
+- **Hardware Discovery:** Detects and visualizes attached devices (NVMe, USB SSD, SD). Shows actual boot device and lists all detected disks with mount status.
+- **Mount Control:** Inline "Mount" action for unmounted removable storage (e.g., USB backup SSD) from the dashboard.
 - **Docker Integration:** Monitors running Docker containers with controls to start, stop, restart, and fetch logs.
-- **Backup and Restore Management:** Initiate, monitor in-progress backups, and abort operations if necessary.
-- **Platform Detection:** Integrates seamlessly with Hailo AI and Scrypted containers for edge processing.
+- **Backup and Restore Management:** Initiate backups, view progress/logs, abort in-flight jobs, and restore from available backups.
+- **Platform Detection:** Integrates with Hailo AI and Scrypted containers for edge processing.
 
 ## Architecture
 - **Backend:** The core is written in Python (`stats_api.py`), serving via HTTPS and heavily interacting with local machine stats via `psutil` and Docker.
@@ -42,7 +43,7 @@ This project is released under the **Apache 2.0 License**. Check out the `LICENS
 Below are steps to deploy the Pi Status Dashboard:
 ```bash
 cd /home/jessegreene/status-dashboard
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 ### Default Configuration
@@ -51,8 +52,9 @@ docker-compose up -d --build
 
 ## Additional Notes
 - Logs: `docker logs -f pi5-status-dashboard`
-- Rebuild: `docker-compose build --no-cache && docker-compose up -d`
+- Rebuild: `docker compose build --no-cache && docker compose up -d`
 - Stats cache: updated every 5 seconds. Hardware refresh cache every 30 seconds.
+- Storage API: `GET /api/storage/devices` lists detected disks and mount status; `POST /api/storage/mount` mounts an allowed target (defaults to `/mnt/backup-ssd`).
 - Set environment variable overrides in `.env` as needed.
 
 ## Screenshots
