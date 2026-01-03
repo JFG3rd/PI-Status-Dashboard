@@ -1323,14 +1323,16 @@
             const rows = devices.map(dev => {
                 const mounted = dev.mounted;
                 const mountInfo = mounted
-                    ? `Mounted at ${dev.mountpoint || 'unknown'}`
-                    : 'Not mounted';
+                    ? `Status: Mounted at ${dev.mountpoint || 'unknown'}`
+                    : 'Status: Not mounted';
                 const usage = dev.usage
                     ? `${dev.usage.used} / ${dev.usage.total} (${Math.round(dev.usage.percent)}%)`
                     : '--';
-                const btn = (!mounted && dev.suggested_mount)
-                    ? `<button class="btn btn-secondary" style="padding:4px 8px;" onclick="mountStorage('${dev.suggested_mount}')">Mount</button>`
-                    : '';
+                const btn = mounted && dev.mountpoint
+                    ? `<button class="btn btn-secondary" style="padding:4px 8px;" onclick="unmountStorage('${dev.mountpoint}')">Unmount</button>`
+                    : (!mounted && dev.suggested_mount
+                        ? `<button class="btn btn-secondary" style="padding:4px 8px;" onclick="mountStorage('${dev.suggested_mount}')">Mount</button>`
+                        : '');
                 return `
                     <div style="padding:8px; border:1px solid #23395d; border-radius:8px; background:#0f1e36; display:flex; flex-direction:column; gap:4px;">
                         <div style="display:flex; justify-content:space-between; gap:8px;">
@@ -1368,6 +1370,29 @@
               })
               .catch(err => {
                   alert('Mount error: ' + err);
+                  loadStats();
+              });
+        }
+
+        function unmountStorage(mountpoint) {
+            const list = document.getElementById('storageDevicesList');
+            if (list) {
+                list.innerHTML = '<div style="color:#aaa;">Unmounting... please wait</div>';
+            }
+            fetch('/api/storage/umount', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                credentials: 'include',
+                body: JSON.stringify({mountpoint})
+            }).then(r => r.json())
+              .then(res => {
+                  if (!res.success) {
+                      alert('Unmount failed: ' + (res.message || 'Unknown error'));
+                  }
+                  loadStats();
+              })
+              .catch(err => {
+                  alert('Unmount error: ' + err);
                   loadStats();
               });
         }

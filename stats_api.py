@@ -585,6 +585,25 @@ class StatsHandler(BaseHTTPRequestHandler):
                     self.wfile.write(json.dumps({'success': False, 'message': result.stderr or 'mount failed', 'code': result.returncode}).encode())
             except Exception as e:
                 self.wfile.write(json.dumps({'success': False, 'message': str(e)}).encode())
+
+        elif self.path == '/api/storage/umount':
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            try:
+                data = json.loads(body) if body else {}
+                mountpoint = data.get('mountpoint')
+                if not mountpoint or not mountpoint.startswith('/mnt/'):
+                    self.wfile.write(json.dumps({'success': False, 'message': 'Mountpoint not allowed'}).encode())
+                    return
+                result = subprocess.run(['umount', mountpoint], capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    self.wfile.write(json.dumps({'success': True, 'mountpoint': mountpoint}).encode())
+                else:
+                    self.wfile.write(json.dumps({'success': False, 'message': result.stderr or 'umount failed', 'code': result.returncode}).encode())
+            except Exception as e:
+                self.wfile.write(json.dumps({'success': False, 'message': str(e)}).encode())
         
         elif self.path == '/api/restart':
             self.send_response(200)

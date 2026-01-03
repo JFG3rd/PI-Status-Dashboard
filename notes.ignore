@@ -1,0 +1,40 @@
+    ┌──────────────────────────┐
+    │   Fritz!Repeater 6000    │
+    │        (Mesh)            │
+    └─────────────┬────────────┘
+                  │ Port 1  ▼
+        ┌─────────┴─────────┐
+        │   TL‑SG108E        │
+        │   Office Switch    │
+        └──────┬──────┬──────┘
+               │      │
+               │      └───────────── Port 2
+               │
+               │
+        Port 1    ▼
+        ┌───────────────┐
+        │  TL‑SG105E    │
+        │  Lab Switch   │
+        └───┬────┬────┬┘
+            │    │    │
+            │    │    └─────────────── Port 4
+            │    │                     Raspberry Pi 4  
+            |    |                     • SD 117GB
+            │    │                     • 5″ HDMI touchscreen  
+            │    │                     • Optional Scrypted UI  
+            │    │                     • External 5 V PSU
+            │    │
+            │    └───────────────────── Port 3
+            │                          Raspberry Pi 5 (Cluster Client)  
+            |                          • SD 117GB
+            │                          • NVMe HAT+  
+            │                          • NVMe SSD 256GB
+            │                          • External 5 V PSU
+            │
+            └────────────────────────── Port 2
+                                        Raspberry Pi 5 (Server / NVR)  
+                                        • SD 117GB
+                                        • Seeed Dual NVMe HAT  
+                                        • NVMe SSD 1TB (recordings)  
+                                        • Hailo‑8L  (for future usage once Scrypted supports the AI)
+                                        • External 5 V PSU
