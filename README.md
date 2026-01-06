@@ -60,5 +60,6 @@ docker compose up -d --build
 ## Screenshots
 - **Main Dashboard:** ![Main Dashboard](docs/screenshots/PIStatus-MainPage.png)
 - **Backup Manager:** ![Backup Manager](docs/screenshots/PIStatus-BackupPage.png)
-
-Let’s build something amazing together!
+- **Restore Manager:** ![Backup Manager](docs/screenshots/PIStatus-RestorePage.png)
+-
+- Let’s build something amazing together!
